@@ -8,6 +8,30 @@ import tensorflow as tf
 from deepts.feature_column import (SparseFeat, DenseFeat, get_embedding_features, get_dense_features)
 from deepts.utils import numpy_input_fn
 
+class Dataset:
+    def __init__(self, name):
+        self.name = name
+    
+    def get_raw_data(self):
+        raise NotImplementedError
+
+    @property
+    def name(self):
+        return self.name
+
+class DeeptsData(Dataset):
+    def __init__(self, name):
+        super(DeeptsData, self).__init__(name)
+    
+    def minmax(self):
+        pass
+
+    def get_raw_data(self):
+        return raw_data
+
+    def get_deepts_data(self):
+        pass
+
 
 def get_sequence_features(Y, lag):
     sequence_feature = pd.DataFrame()

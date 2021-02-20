@@ -1,6 +1,6 @@
 {
     "dataset": {
-        "dir_root": "~/TSF/deepar_tf/data",
+        "dir_root": "~/TSF/deepts/examples/data",
         "bike_hour": {
             "file_path": "bike_hour.csv",
             "csv_kwargs": {

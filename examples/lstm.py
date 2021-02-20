@@ -40,7 +40,7 @@ def TSF_LSTM(config_model, config_dataset, model_name, ds_name):
     # train
     callback_list = get_callbacks(config_callbacks)
     model.compile('adam', 'mae', metrics=[MASE()])
-    model.fit(x_train, y_train, batch_size=batch_size, epochs=3, callbacks=callback_list, 
+    model.fit(x_train, y_train, batch_size=batch_size, epochs=100, callbacks=callback_list, 
             validation_data=(x_valid, y_valid))
     y_pred = model.predict(x_test)
     filename = save_predictions(x_test, y_test, y_pred)
