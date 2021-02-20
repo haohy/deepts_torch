@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(1, os.getcwd())
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import logging
-import numpy as np
+import tensorflow as tf
 
 from deepts.models import LSTM
 from deepts.estimator import LSTMEstimator
