@@ -1,0 +1,57 @@
+{
+    "dataset": {
+        "dir_root": "~/TSF/deepar_tf/data",
+        "bike_hour": {
+            "file_path": "bike_hour.csv",
+            "csv_kwargs": {
+                "index_col": 0
+            },
+            "sparse_col": {
+                "season": 0,
+                "holiday": 0,
+                "workingday": 5,
+                "weathersit": 0
+            },
+            "dense_col": [
+                "weekday", "yr", "mnth", "hr", "temp", "atemp", "hum", "windspeed", "casual", "registered"
+            ],
+            "target": "cnt"
+        }
+    },
+
+    "model": {
+        "model_dir": "./model_dir",
+        "Test": {
+            "model_name": "LSTM",
+            "hid_dim": 64,
+            "lag": 7,
+            "n_back": 10,
+            "n_fore": 5,
+            "batch_size": 32,
+            "callbacks": {
+                "tensorboard": {
+                    "log_dir": "./logs"
+                }
+            }
+        },
+        "LSTM": {
+            "model_name": "LSTM",
+            "hid_dim": 64,
+            "lag": 7,
+            "n_back": 168,
+            "n_fore": 24,
+            "batch_size": 32,
+            "callbacks": {
+                "tensorboard": {
+                    "log_dir": "./logs"
+                }
+            }
+        },
+        "DeepAR": {
+            "hid_dim": 64,
+            "lag": 7,
+            "batch_size": 32,
+            "window_size": 10
+        }
+    }
+}

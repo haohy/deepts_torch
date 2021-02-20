@@ -1,0 +1,7 @@
+SAMPLE_SIZE = 1000
+MODEL_DIR = './model_dir'
+LAG = 7
+BATCH_SIZE = 32
+WINDOW_SIZE = 10
+N_BACK = 10
+N_FORE = 5
