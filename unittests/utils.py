@@ -36,7 +36,7 @@ def get_input_fn(feature_dict, Y):
     pass
 
 def check_model(model, model_name, x, y, batch_size, metrics):
-    config_callbacks = {"tensorboard": {"log_dir": "./logs"}}
+    config_callbacks = {"tensorboard": {"log_dir": "~/TSF/deepts/unittests/logs"}}
     callback_list = get_callbacks(config_callbacks)
     model.compile('adam', 'mae', metrics=metrics)
     model.fit(x, y, batch_size=batch_size, epochs=2, callbacks=callback_list)
