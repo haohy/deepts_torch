@@ -14,14 +14,14 @@ def set_logging():
         format='[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s')
     return logging
 
-def save_predictions(x_test, y_true, y_pred):
+def save_predictions(y_back, y_true, y_pred):
     logging = set_logging()
     test = {
-        'x_test': x_test,
+        'y_back': y_back,
         'y_true': y_true,
         'y_pred': y_pred
     }
-    tag = str(datetime.datetime.now())
+    tag = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     filename = save_dir + tag + '.pkl'
     with open(filename, 'wb') as f:
         pickle.dump(test, f)
@@ -35,16 +35,19 @@ def load_predictions(filename):
     logging.info('Load predicitons!')
     return testset
 
-def plot_predictions(filename, lag):
+def plot_predictions(filename, ts_index):
     logging = set_logging()
-    fig, axs= plt.subplots(1, 1)
+    fig, axes= plt.subplots(len(ts_index), 1, figsize=(8, 2+2*len(ts_index)))
     testset = load_predictions(filename)
-    x_back = list(range(len(testset['x_test'][0])))
-    x_fore = list(range(len(testset['x_test'][0]), len(testset['x_test'][0])+len(testset['y_pred'][0])))
-    axs.plot(x_back, testset['x_test'][0][:, -lag], label='back')
-    axs.plot(x_fore, testset['y_pred'][0], label='pred')
-    axs.plot(x_fore, testset['y_true'][0], label='true')
-    axs.legend()
+    n_back = len(testset['y_back'][0])
+    n_fore = len(testset['y_pred'][0])
+    x_back = list(range(n_back))
+    x_fore = list(range(n_back, n_back + n_fore))
+    for idx, ts_idx in enumerate(ts_index):
+        axes[idx].plot(x_back, testset['y_back'][ts_idx], label='back')
+        axes[idx].plot(x_fore, testset['y_pred'][ts_idx], label='pred')
+        axes[idx].plot(x_fore, testset['y_true'][ts_idx], label='true')
+        axes[idx].legend()
     plt.savefig(filename+'.png', format='png')
     plt.close()
     logging.info("Plot predictions and the figure saved!")

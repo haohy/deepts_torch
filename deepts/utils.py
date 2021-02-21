@@ -5,6 +5,11 @@ from tensorflow.keras import Input, callbacks
 
 from deepts.feature_column import SparseFeat, DenseFeat
 
+def set_logging():
+    import logging
+    logging.basicConfig(level = logging.INFO,
+        format='[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s')
+    return logging
 
 def build_input_features(feature_columns):
     pass
@@ -59,12 +64,3 @@ def get_callbacks(config):
         callback_list.append(callbacks.EarlyStopping(**config_es))
 
     return callback_list if len(callback_list) > 0 else None
-
-def dataset_split(x, y, ratio_list=[6, 2, 2]):
-    ratio_list = np.array([0.0] + ratio_list) / sum(ratio_list)
-    index_list = list(map(int, np.cumsum(ratio_list) * len(y)))
-    train_slice, valid_slice, test_slice = [slice(index_list[i], index_list[i+1]) \
-                                            for i in range(len(index_list)-1)]
-    return x[train_slice], y[train_slice],\
-        x[valid_slice], y[valid_slice],\
-        x[test_slice], y[test_slice]
