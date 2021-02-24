@@ -6,7 +6,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import tensorflow as tf
 
-from deepts.layers import AttentionBlock, TemporalBlock, TemporalConvNet
+from deepts.layers import AttentionBlock, TemporalBlock, TemporalConvNet,TCN
 from unittests.config import SAMPLE_SIZE, BATCH_SIZE, N_BACK
 
 
@@ -41,7 +41,7 @@ def test_TemporalBlock(temp_attn, en_res, is_conv, softmax_axis):
     stride = 1
     dilation = 2
     visual = False
-    temporalblock_layer = TemporalBlock(softmax_axis, n_inputs, n_outputs, kernel_size, 
+    temporalblock_layer = TemporalBlock(softmax_axis, n_outputs, kernel_size, 
                                         num_sub_blocks, attn_dim, temp_attn, en_res, is_conv, 
                                         stride, dilation, visual, dropout=0.2)
     inputs = tf.random.normal((BATCH_SIZE, N_BACK, n_inputs))
@@ -64,14 +64,23 @@ def test_TemporalConvNet(temp_attn, en_res, is_conv, softmax_axis):
     num_sub_blocks = 2
     attn_dim = 10
     visual = False
-    temporalconvnet_layer = TemporalConvNet(emb_dim, attn_dim, channel_list, num_sub_blocks, 
+    temporalconvnet_layer = TemporalConvNet(attn_dim, channel_list, num_sub_blocks, 
                                         temp_attn, en_res, is_conv, softmax_axis, kernel_size,
                                         visual, dropout=0.2)
     inputs = tf.random.normal((BATCH_SIZE, N_BACK, emb_dim))
     outputs = temporalconvnet_layer(inputs)
     print(outputs[0].shape)
 
-
+@pytest.mark.parametrize(
+    '',
+    [()]
+)
+def test_TCN():
+    tcn_layer = TCN()
+    x_num = tf.random.normal((BATCH_SIZE, 168))
+    x_cat = tf.random.uniform((BATCH_SIZE, 24, 8), minval=0, maxval=2, dtype=tf.int64)
+    outputs = tcn_layer(x_num, x_cat)
+    print(outputs.shape)
 
 if __name__ == '__main__':
     physical_devices = tf.config.list_physical_devices('GPU') 
@@ -81,4 +90,5 @@ if __name__ == '__main__':
     # test_TemporalBlock(True, True, True, 1)
     # pytest.main(['-s', '-k', 'TemporalBlock', './unittests/layers/test_interaction.py'])
     # test_TemporalConvNet(True, True, False, 1)
-    pytest.main(['-s', '-k', 'TemporalConvNet', './unittests/layers/test_interaction.py'])
+    # pytest.main(['-s', '-k', 'TemporalConvNet', './unittests/layers/test_interaction.py'])
+    test_TCN()

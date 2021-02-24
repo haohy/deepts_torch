@@ -38,12 +38,35 @@
             "model_name": "LSTM",
             "hid_dim": 64,
             "lag": 7,
-            "n_back": 168,
+            "n_back": 24,
             "n_fore": 24,
             "batch_size": 32,
             "callbacks": {
                 "tensorboard": {
-                    "log_dir": "./logs"
+                    "log_dir": "~/TSF/deepts/examples/logs"
+                }
+            }
+        },
+        "TCAN": {
+            "model_name": "TCAN",
+            "channel_list" : [20, 30, 40],
+            "kernel_size": 3,
+            "num_sub_blocks": 2,
+            "attn_dim": 10,
+            "temp_attn": true,
+            "visual": false,
+            "en_res": true,
+            "is_conv": true,
+            "softmax_axis": 1,
+            "num_sparse_feat": 5,
+            "num_dense_feat": 3,
+            "lag": 7,
+            "n_back": 24,
+            "n_fore": 24,
+            "batch_size": 32,
+            "callbacks": {
+                "tensorboard": {
+                    "log_dir": "~/TSF/deepts/examples/logs"
                 }
             }
         },

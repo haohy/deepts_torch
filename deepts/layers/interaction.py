@@ -22,6 +22,113 @@ def _merge_masks(x, y):
         return x
     return math_ops.logical_and(x, y)
 
+
+class ResidualTCN(layers.Layer):
+    """Residual Temporal Convolutional Network block, as a encoder module.
+    
+    Args:
+        - *d*: Integer, dilation rate of `Conv1D`.
+        - *n_residue*: Integer, filter size of `Conv1D`.
+        - *k*: Integer, kernel size of `Conv1D`.
+
+    Call Arguments:
+        - Tensor, shape of `[batch_size, ]`.
+
+    Output:
+        Tensor, shape of `[batch_size, ]`.
+    """
+    def __init__(self, n_residue=11, k=2, d=1, **kwargs):
+        super(ResidualTCN, self).__init__(**kwargs)
+        self.conv1 = layers.Conv1D(filters=n_residue, kernel_size=k, dilation_rate=d)
+        self.bn1 = layers.BatchNormalization()
+        self.conv2 = layers.Conv1D(filters=n_residue, kernel_size=k, dilation_rate=d)
+        self.bn2 = layers.BatchNormalization()
+        
+    def call(self, x):
+        # x_shape = x.shape
+        out = tf.nn.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        # x_ = tf.slice(x, [0, x_shape[1]-out.shape[1], 0], [x_shape[0], out.shape[1], x_shape[2]])
+        return tf.nn.relu(out + x[:, -out.shape[1]:, :])
+    
+    
+class Residual(layers.Layer):
+    def __init__(self, xDim,  **kwargs):
+        super(Residual, self).__init__(**kwargs)
+        self.fc1 = layers.Dense(64)
+        self.bn1 = layers.BatchNormalization(axis=2)
+        self.fc2 = layers.Dense(units=xDim)
+        self.bn2 = layers.BatchNormalization(axis=2)
+
+    def call(self, x):
+        out = tf.nn.relu(self.bn1(self.fc1(x)))
+        out = self.bn2(self.fc2(out))
+        return tf.nn.relu(out + x) 
+
+
+class futureResidual(layers.Layer):
+    def __init__(self, xDim,  **kwargs):
+        super(futureResidual, self).__init__(**kwargs)
+        self.fc1 = layers.Dense(64)
+        self.bn1 = layers.BatchNormalization(axis=2)
+        self.fc2 = layers.Dense(units=xDim)
+        self.bn2 = layers.BatchNormalization(axis=2)
+        
+    def call(self, x_conv, x):
+        out = tf.nn.relu(self.bn1(self.fc1(x)))
+        out = self.bn2(self.fc2(out))
+        return tf.nn.relu(x_conv + out) 
+
+    
+class TCN(layers.Layer):
+    def __init__(self, dilation_depth=2, n_repeat=5, **kwargs):
+        super(TCN, self).__init__(**kwargs)
+        self.dilations = [1,2,4,8,16,20,32]
+        self.TCN = []
+        ## The embedding part
+        self.store_embedding = layers.Embedding(370, 10)
+        self.nMonth_embedding = layers.Embedding(12, 2)
+        self.nYear_embedding = layers.Embedding(3, 2)
+        self.mDay_embedding = layers.Embedding(31, 5)
+        self.wday_embedding = layers.Embedding(7, 3)
+        self.nHour_embedding = layers.Embedding(24, 4)
+        self.holiday_embedding = layers.Embedding(2, 2)
+        for d in self.dilations:
+            self.TCN.append(ResidualTCN(d=d))
+        self.post_res = futureResidual(xDim=22)
+        self.reshape_layer = layers.Reshape([1, -1])
+        
+        self.net = Sequential()
+        self.net.add(layers.Dense(64))
+        self.net.add(layers.BatchNormalization(axis=2))
+        self.net.add(layers.ReLU())
+        self.net.add(layers.Dropout(.2))
+        self.net.add(layers.Dense(1, activation='relu'))
+                       
+    def call(self, x_num, x_cat):
+        # x_num: [batch_size, 168]
+        # x_cat: [batch_size, 24, 22]
+        # preprocess
+        store_embed = self.store_embedding(x_cat[:,:,0])
+        embed_concat = tf.concat(
+                [store_embed,
+                self.nYear_embedding(x_cat[:,:,2]),
+                self.nMonth_embedding(x_cat[:,:,3]),
+                self.mDay_embedding(x_cat[:,:,4]),
+                self.wday_embedding(x_cat[:,:,5]),
+                self.nHour_embedding(x_cat[:,:,6])],
+                axis=2)
+        input_store = tf.tile(store_embed[:,0:1,:], [1, 168, 1])    # input_store: [batch_size, 168, 10]
+        output = tf.concat([input_store, tf.expand_dims(x_num, axis=-1)], axis=2)   # output: [batch_size, 168, 11]
+        for sub_TCN in self.TCN:
+            output = sub_TCN(output)    # output: [batch_size, 168, 11]
+        output = self.reshape_layer(output)   # output: [batch_size, 1, 11*2]
+        output = tf.tile(output, [1, 24, 1])    # output: [batch_size, 24, 11*2]
+        # output: [batch_size, 24, 11*2], embed_concat: [batch_size, 24, 26]
+        output = self.net(self.post_res(output, embed_concat))  
+        return tf.squeeze(output, axis=-1)   # output: [batch_size, 24, 1]
+
+
 class AttentionBlock(layers.Attention):
     """Dot-product attention layer, a.k.a. Luong-style attention.
     
@@ -99,8 +206,8 @@ class AttentionBlock(layers.Attention):
 
         def dropped_weights():
             return nn.dropout(weights, rate=self.dropout)
-
-        weights = tf.cond(training, dropped_weights, lambda: array_ops.identity(weights))
+        training_bool = tf.cast(training, dtype=tf.bool)
+        weights = tf.cond(training_bool, dropped_weights, lambda: array_ops.identity(weights))
         return math_ops.matmul(weights, value), weights
 
     def _calculate_scores(self, query, key):
@@ -176,7 +283,6 @@ class TemporalBlock(layers.Layer):
 
     Args:
         - *softmax_axis*: Integer, which axis the `softmax` function calculate along.
-        - *n_inputs*: Integer, the number of convolutional layer's input channel. 
         - *n_outputs*: Integer, the number of convolutional layer's output channel. 
         - *kernel_size*: Integer, the size of convolutional layer's kernel. 
         - *num_sub_blocks*: Integer, the number of convolutional layer. 
@@ -195,9 +301,8 @@ class TemporalBlock(layers.Layer):
         - Tensor of shape `[batch_size, n_back, n_outputs]`
         - [Optional] attn_weight_cpu
     """
-    def __init__(self, softmax_axis, n_inputs, n_outputs, kernel_size, num_sub_blocks, attn_dim, 
+    def __init__(self, softmax_axis, n_outputs, kernel_size, num_sub_blocks, attn_dim, 
                 temp_attn, en_res, is_conv, stride, dilation, visual, dropout=0.2):
-        self.n_inputs = n_inputs
         self.n_outputs = n_outputs
         self.kernel_size = kernel_size
         self.attn_dim = attn_dim
@@ -272,7 +377,6 @@ class TemporalConvNet(layers.Layer):
     """Temporal Block for TemporalConvBlock.
 
     Args:
-        - *emb_dim*: Integer, dimensionality of embedding.
         - *attn_dim*: Integer, dimensionality of `AttetionBlock`'s dense layer.
         - *channel_list*: List, list of multi-block's channel size.
         - *num_sub_blocks*: Integer, the number of convolutional layer. 
@@ -291,24 +395,23 @@ class TemporalConvNet(layers.Layer):
         - Tensor of shape `[batch_size, n_back, n_outputs]`
         - [Optional] attn_weight_cpu
     """
-    def __init__(self, emb_dim, attn_dim, channel_list, num_sub_blocks, temp_attn, en_res,
+    def __init__(self, attn_dim, channel_list, num_sub_blocks, temp_attn, en_res,
                 is_conv, softmax_axis, kernel_size, visual, dropout=0.2):
         super(TemporalConvNet, self).__init__()
         self.temp_attn = temp_attn
         layer_list = []
         for i in range(len(channel_list)):
             dilation_rate = 2 ** i
-            in_channels = emb_dim if i == 0 else channel_list[i-1]
             out_channels = channel_list[i]
-            layer_list.append(TemporalBlock(softmax_axis, in_channels, out_channels, kernel_size, 
+            layer_list.append(TemporalBlock(softmax_axis, out_channels, kernel_size, 
                             num_sub_blocks, attn_dim, temp_attn, en_res, is_conv, 1, dilation_rate, 
                             visual, dropout))
         self.network = layer_list
 
     def call(self, inputs):
-        attn_weight_list = []
         out = inputs
         if self.temp_attn:
+            attn_weight_list = []
             for i in range(len(self.network)):
                 out, attn_weight = self.network[i](out)
                 attn_weight_list.append([attn_weight[0], attn_weight[-1]])
