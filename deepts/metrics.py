@@ -32,6 +32,7 @@ class MASE(Metric):
 
     def reset_states(self):
         self.mase.assign(0.0)
+        self.count.assign(0.0)
 
 
 class ND(Metric):

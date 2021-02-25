@@ -3,7 +3,6 @@ import os, sys
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(1, os.getcwd())
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import logging
 import tensorflow as tf
 from tensorflow.keras.metrics import MeanAbsoluteError, MeanAbsolutePercentageError
 

@@ -11,15 +11,111 @@ from deepts.utils import set_logging, numpy_input_fn
 logging = set_logging()
 
 class Dataset:
-    def __init__(self, name):
+    """Base class for `Dataset`.
+
+    Args:
+        df: pandas.DataFrame, columns can't be None.
+        emb_dict: Dictionary, {'day_of_week': 3} represent the column 'day_of_week' is needed to be 
+            embedded and the embedding dimensionality is `3`, the dimensionality `0` represent no 
+            need of embedding, i.e., using one-hot for that column.
+        name: String, name of the dataset.
+        
+    """
+    def __init__(self, df, emb_dict, name):
+        self.df = df
+        self.emb_dict = emb_dict
         self._name = name
+        self._feature_columns = None
     
     def get_raw_data(self):
-        raise NotImplementedError
+        return self.df
 
     @property
     def name(self):
         return self._name
+
+
+class TSDataset(Dataset):
+    def __init__(self, feat_dict, n_back, n_fore, lag, sliding_window_dis, name):
+        self._feat_dict = feat_dict
+        self.n_back = n_back
+        self.n_fore = n_fore
+        self.lag = lag
+        self.sliding_window_dis = sliding_window_dis
+        self._dynamic_feature = None
+        self._static_dict = None
+        self._time_series = None
+        self._name = name
+
+    def check_df(self):
+        if self._static_feature is None or self._dynamic_feature in None:
+            raise ValueError("TSDataset doesn't has dataframe.")
+        if not (self._dynamic_feature.columns == list(self.feat_dict.keys())):
+            raise ValueError("Dynamic columns {} should be same with it's feat_dict {}"
+                            .format(self.df_raw.columns, list(self._feat_dict.keys())))
+
+    def get_time_series(self, df):
+        self._time_series = df
+        self._static_dict = {col: i for i, col in enumerate(df.columns)}
+
+    def get_features(self, df_feat):
+        self._dynamic_feature = df_feat
+
+    def from_csv(self, file_path, csv_kwargs):
+        df_csv = pd.read_csv(file_path, **csv_kwargs)
+        self.df_raw = df_csv
+
+    def df_to_dataset(self, n_back, n_fore, lag):
+        self.check_df()
+        static_cols = [k for k, v in self._feat_dict.items() if v[0] == 0]
+        dynamic_cols = [k for k, v in self._feat_dict.items() if v[0] == 1]
+        
+        
+    
+    def get_sparse_feat_cols(self, feat_col_dict):
+        feat_cols = []
+        for key, val in feat_col_dict:
+            feat_cols.append(SparseFeat(key, val[0], val[2], val[3], val[4], 'int64'))
+        return feat_cols
+
+    def get_dense_feat_cols(self, feat_col_dict):
+        feat_cols = []
+        for key, val in feat_col_dict:
+            feat_cols.append(DenseFeat(key, val[0], val[2], val[4], 'float32'))
+        return feat_cols
+
+    def get_features(self):
+        sparse_feat_cols, dense_feat_cols = [], []
+        sparse_feat_dict = {k: v for k, v in self._feat_cols.items() if v[1] == 1}
+        dense_feat_dict = {k: v for k, v in self._feat_cols.items() if v[1] == 0}
+        sparse_feat_cols = self.get_sparse_feat_cols(sparse_feat_dict)
+        dense_feat_cols = self.get_dense_feat_cols(dense_feat_dict)
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def feat_dict(self):
+        return self._feat_dict
+
+    @property
+    def target_col(self):
+        return self._target_col
+
+
+# n_fore = input_dynamic_emb.shape[1]
+# store_embed = self.store_embedding(input_cov[:,:,0])
+# embed_concat = tf.concat(
+#         [store_embed,
+#         self.nYear_embedding(input_cov[:,:,2]),
+#         self.nMonth_embedding(input_cov[:,:,3]),
+#         self.mDay_embedding(input_cov[:,:,4]),
+#         self.wday_embedding(input_cov[:,:,5]),
+#         self.nHour_embedding(input_cov[:,:,6])],
+#         axis=2)
+# input_store = tf.tile(store_embed[:,0:1,:], [1, 168, 1])    # input_store: [batch_size, 168, 10]
+
 
 class DeeptsData(Dataset):
     def __init__(self, X, Y, feature_columns, name, n_back=1, n_fore=1, lag=0):
