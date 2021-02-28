@@ -6,6 +6,7 @@ from tensorflow.keras import initializers
 from tensorflow.python.ops import array_ops, init_ops, math_ops, nn, control_flow_util
 from tensorflow.python.keras import backend as K
 
+from IPython import embed
 
 def _lower_triangular_mask(shape):
     """Creates a lower-triangular boolean mask over the last 2 dimensions."""
@@ -28,7 +29,7 @@ class ResidualTCN(layers.Layer):
     
     Args:
         - *d*: Integer, dilation rate of `Conv1D`.
-        - *residual_filter*: Integer, filter size of residual `Conv1D`.
+        - *conv_filter*: Integer, filter size of residual `Conv1D`.
         - *k*: Integer, kernel size of `Conv1D`.
 
     Call Arguments:
@@ -37,13 +38,13 @@ class ResidualTCN(layers.Layer):
     Output:
         Tensor, shape of `[batch_size, ]`.
     """
-    def __init__(self, residual_filter=11, k=2, d=1, **kwargs):
+    def __init__(self, conv_filter=11, k=2, d=1, **kwargs):
         super(ResidualTCN, self).__init__(**kwargs)
-        self.conv1 = layers.Conv1D(filters=residual_filter, kernel_size=k, dilation_rate=d)
+        self.conv1 = layers.Conv1D(filters=conv_filter, kernel_size=k, dilation_rate=d)
         self.bn1 = layers.BatchNormalization()
-        self.conv2 = layers.Conv1D(filters=residual_filter, kernel_size=k, dilation_rate=d)
+        self.conv2 = layers.Conv1D(filters=conv_filter, kernel_size=k, dilation_rate=d)
         self.bn2 = layers.BatchNormalization()
-        
+            
     def call(self, inputs):
         out = tf.nn.relu(self.bn1(self.conv1(inputs)))
         out = self.bn2(self.conv2(out))
@@ -76,114 +77,115 @@ class futureResidual(layers.Layer):
         return tf.nn.relu(hidden_emb + out) 
 
 
+class TCN(layers.Layer):
+    """Temporal Convolutional Network. 
+
+    Args:
+        - *dilation_depth*: List, .
+        - *n_repeat*: Integer, 
+
+    Call Arguments:
+        input_ts: `Tensor` with shape `[batch_size, n_back, 1]`.
+        input_static_emb: `Tensor` with shape `[batch_size, n_fore, dim1]`.
+        input_dynamic_emb: `Tensor` with shape `[batch_size, n_fore, dim2]`.
+
+    Outputs:
+        `Tensor` with shape `[batch_size, n_fore]`
+    """
+    def __init__(self, n_back, n_fore, dilation_list=[1,2,4,8,16,20,32], 
+                conv_filter=11, conv_ksize=2, dilation_depth=2, n_repeat=5, **kwargs):
+        super(TCN, self).__init__(**kwargs)
+        self.dilation_list = dilation_list
+        self.dilation_depth = dilation_depth
+        self.n_repeat = n_repeat
+        self.n_back = n_back
+        self.n_fore = n_fore
+        self.conv_filter = conv_filter
+        self.conv_ksize = conv_ksize
+        units_futureResidual = n_back
+        for dilation_rate in dilation_list:
+            units_futureResidual -= 2 * (conv_ksize - 1) * dilation_rate
+        self.units_futureResidual = units_futureResidual
+        
+    def build(self, input_shape):
+        self.TCN_list = []
+        for d in self.dilation_list:
+            self.TCN_list.append(ResidualTCN(self.conv_filter, k=self.conv_ksize, d=d))
+        
+        self.decoder_predict = Sequential([
+            layers.Dense(64),
+            layers.BatchNormalization(axis=2),
+            layers.ReLU(),
+            layers.Dropout(.2),
+            layers.Dense(1, activation='relu')
+        ])
+
+        self.decoder_res = futureResidual(units=self.units_futureResidual*self.conv_filter)
+        self.reshape_layer = layers.Reshape([1, -1])
+                       
+    def call(self, input_ts, input_static_emb, input_dynamic_emb):
+        # input_ts: [batch_size, n_back], time series.
+        # input_static_emb: [batch_size, n_back+n_fore, emb_dim].
+        # input_dynamic_emb: [batch_size, n_fore, dim_total], covariate.
+        # preprocess
+        output = tf.concat([input_static_emb[:, :self.n_back, :], tf.expand_dims(input_ts, axis=-1)], axis=2)
+        for tcn_layer in self.TCN_list:
+            output = tcn_layer(output)    # output: [batch_size, n_back, conv_filter]
+        output = self.reshape_layer(output)   # output: [batch_size, 1, units_futureResidual*conv_filter]
+        output = tf.tile(output, [1, self.n_fore, 1])
+        # output: [batch_size, n_fore, 11*2], embed_concat: [batch_size, n_fore, dim_total]
+        dynamic_emb = tf.concat([input_static_emb[:, -self.n_fore:, :], input_dynamic_emb], axis=2)
+        output = self.decoder_predict(self.decoder_res(output, dynamic_emb))  
+        return tf.squeeze(output, axis=-1)   # output: [batch_size, n_fore, 1]
+
+
 # class TCN(layers.Layer):
-#     """Temporal Convolutional Network. 
-
-#     Args:
-#         - *dilation_depth*: List, .
-#         - *n_repeat*: Integer, 
-
-#     Call Arguments:
-#         input_ts: `Tensor` with shape `[batch_size, n_back, 1]`.
-#         input_static_emb: `Tensor` with shape `[batch_size, n_fore, dim1]`.
-#         input_dynamic_emb: `Tensor` with shape `[batch_size, n_fore, dim2]`.
-
-#     Outputs:
-#         `Tensor` with shape `[batch_size, n_fore]`
-#     """
-#     def __init__(self, n_back_dim, dilation_list=[1,2,4,8,16,20,32], dilation_depth=2, n_repeat=5, **kwargs):
+#     def __init__(self, dilation_depth=2, n_repeat=5, **kwargs):
 #         super(TCN, self).__init__(**kwargs)
-#         self.dilation_list = dilation_list
-#         self.dilation_depth = dilation_depth
-#         self.n_repeat = n_repeat
-        
-#         # self.store_embedding = layers.Embedding(370, 10)
-#         # self.nMonth_embedding = layers.Embedding(12, 2)
-#         # self.nYear_embedding = layers.Embedding(3, 2)
-#         # self.mDay_embedding = layers.Embedding(31, 5)
-#         # self.wday_embedding = layers.Embedding(7, 3)
-#         # self.nHour_embedding = layers.Embedding(24, 4)
-#         # self.holiday_embedding = layers.Embedding(2, 2)
-        
-#     def build(self, input_shape):
+#         self.dilation_list = [1,2,4,8,16,20,32]
 #         self.TCN_list = []
+#         ## The embedding part
+#         self.store_embedding = layers.Embedding(370, 10)
+#         self.nMonth_embedding = layers.Embedding(12, 2)
+#         self.nYear_embedding = layers.Embedding(3, 2)
+#         self.mDay_embedding = layers.Embedding(31, 5)
+#         self.wday_embedding = layers.Embedding(7, 3)
+#         self.nHour_embedding = layers.Embedding(24, 4)
+#         self.holiday_embedding = layers.Embedding(2, 2)
 #         for d in self.dilation_list:
 #             self.TCN_list.append(ResidualTCN(d=d))
-        
-#         self.decoder_predict = Sequential([
-#             layers.Dense(64),
-#             layers.BatchNormalization(axis=2),
-#             layers.ReLU(),
-#             layers.Dropout(.2),
-#             layers.Dense(1, activation='relu')
-#         ])
-
 #         self.decoder_res = futureResidual(units=22)
 #         self.reshape_layer = layers.Reshape([1, -1])
+        
+#         self.decoder_predict = Sequential()
+#         self.decoder_predict.add(layers.Dense(64))
+#         self.decoder_predict.add(layers.BatchNormalization(axis=2))
+#         self.decoder_predict.add(layers.ReLU())
+#         self.decoder_predict.add(layers.Dropout(.2))
+#         self.decoder_predict.add(layers.Dense(1, activation='relu'))
                        
-#     def call(self, input_ts, input_static_emb, input_dynamic_emb):
+#     def call(self, input_ts, input_cov):
 #         # input_ts: [batch_size, 168], time series.
 #         # input_cov: [batch_size, 24, 22], covariate.
 #         # preprocess
-        
-
-#         output = tf.concat([input_static_emb, tf.expand_dims(input_ts, axis=-1)], axis=2)   # output: [batch_size, 168, 11]
+#         store_embed = self.store_embedding(input_cov[:,:,0])
+#         embed_concat = tf.concat(
+#                 [store_embed,
+#                 self.nYear_embedding(input_cov[:,:,2]),
+#                 self.nMonth_embedding(input_cov[:,:,3]),
+#                 self.mDay_embedding(input_cov[:,:,4]),
+#                 self.wday_embedding(input_cov[:,:,5]),
+#                 self.nHour_embedding(input_cov[:,:,6])],
+#                 axis=2)
+#         input_store = tf.tile(store_embed[:,0:1,:], [1, 168, 1])    # input_store: [batch_size, 168, 10]
+#         output = tf.concat([input_store, tf.expand_dims(input_ts, axis=-1)], axis=2)   # output: [batch_size, 168, 11]
 #         for tcn_layer in self.TCN_list:
 #             output = tcn_layer(output)    # output: [batch_size, 168, 11]
 #         output = self.reshape_layer(output)   # output: [batch_size, 1, 11*2]
-#         output = tf.tile(output, [1, n_fore, 1])    # output: [batch_size, 24, 11*2]
+#         output = tf.tile(output, [1, 24, 1])    # output: [batch_size, 24, 11*2]
 #         # output: [batch_size, 24, 11*2], embed_concat: [batch_size, 24, 26]
-#         output = self.decoder_predict(self.decoder_res(output, input_dynamic_emb))  
+#         output = self.decoder_predict(self.decoder_res(output, embed_concat))  
 #         return tf.squeeze(output, axis=-1)   # output: [batch_size, 24, 1]
-
-
-class TCN(layers.Layer):
-    def __init__(self, dilation_depth=2, n_repeat=5, **kwargs):
-        super(TCN, self).__init__(**kwargs)
-        self.dilation_list = [1,2,4,8,16,20,32]
-        self.TCN_list = []
-        ## The embedding part
-        self.store_embedding = layers.Embedding(370, 10)
-        self.nMonth_embedding = layers.Embedding(12, 2)
-        self.nYear_embedding = layers.Embedding(3, 2)
-        self.mDay_embedding = layers.Embedding(31, 5)
-        self.wday_embedding = layers.Embedding(7, 3)
-        self.nHour_embedding = layers.Embedding(24, 4)
-        self.holiday_embedding = layers.Embedding(2, 2)
-        for d in self.dilation_list:
-            self.TCN_list.append(ResidualTCN(d=d))
-        self.decoder_res = futureResidual(units=22)
-        self.reshape_layer = layers.Reshape([1, -1])
-        
-        self.decoder_predict = Sequential()
-        self.decoder_predict.add(layers.Dense(64))
-        self.decoder_predict.add(layers.BatchNormalization(axis=2))
-        self.decoder_predict.add(layers.ReLU())
-        self.decoder_predict.add(layers.Dropout(.2))
-        self.decoder_predict.add(layers.Dense(1, activation='relu'))
-                       
-    def call(self, input_ts, input_cov):
-        # input_ts: [batch_size, 168], time series.
-        # input_cov: [batch_size, 24, 22], covariate.
-        # preprocess
-        store_embed = self.store_embedding(input_cov[:,:,0])
-        embed_concat = tf.concat(
-                [store_embed,
-                self.nYear_embedding(input_cov[:,:,2]),
-                self.nMonth_embedding(input_cov[:,:,3]),
-                self.mDay_embedding(input_cov[:,:,4]),
-                self.wday_embedding(input_cov[:,:,5]),
-                self.nHour_embedding(input_cov[:,:,6])],
-                axis=2)
-        input_store = tf.tile(store_embed[:,0:1,:], [1, 168, 1])    # input_store: [batch_size, 168, 10]
-        output = tf.concat([input_store, tf.expand_dims(input_ts, axis=-1)], axis=2)   # output: [batch_size, 168, 11]
-        for tcn_layer in self.TCN_list:
-            output = tcn_layer(output)    # output: [batch_size, 168, 11]
-        output = self.reshape_layer(output)   # output: [batch_size, 1, 11*2]
-        output = tf.tile(output, [1, 24, 1])    # output: [batch_size, 24, 11*2]
-        # output: [batch_size, 24, 11*2], embed_concat: [batch_size, 24, 26]
-        output = self.decoder_predict(self.decoder_res(output, embed_concat))  
-        return tf.squeeze(output, axis=-1)   # output: [batch_size, 24, 1]
 
 
 class AttentionBlock(layers.Attention):

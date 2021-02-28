@@ -3,22 +3,57 @@
         "dir_root": "/home/haohy/TSF/deepts/examples/data",
         "bike_hour": {
             "file_path": "bike_hour.csv",
-            "csv_kwargs": {
-                "index_col": 0
+            "pkl_path": "pkls/bike_hour.pkl",
+            "csv_kwargs": {},
+            "static_feat": "static",
+            "static_feat_dim": 2,
+            "dynamic_feat_cat": {
+                "season": [1, 1, 2],
+                "yr": [1, 1, 2],
+                "mnth": [1, 1, 3],
+                "weekday": [1, 1, 5],
+                "workingday": [1, 1, 5],
+                "weathersit": [1, 1, 5],
+                "hr": [1, 1,6],
+                "holiday": [1, 0, 2]
             },
-            "sparse_col": {
-                "season": 0,
-                "holiday": 0,
-                "workingday": 5,
-                "weathersit": 0
-            },
-            "dense_col": [
-                "weekday", "yr", "mnth", "hr", "temp", "atemp", "hum", "windspeed", "casual", "registered"
-            ],
+            "dynamic_feat_real": ["temp", "atemp", "hum", "windspeed", "casual", "registered"],
             "target": "cnt"
         },
         "electricity": {
-            "time_series_file_path": "electricity/NewTCNQuantile/time_series.csv",
+            "file_path": "electricity_small.csv",
+            "pkl_path": "pkls/electricity_small.pkl",
+            "csv_kwargs": {},
+            "static_feat": "category",
+            "static_feat_dim": 10,
+            "dynamic_feat_cat": {
+                "year": [1, 1, 2],
+                "month": [1, 1, 3],
+                "day": [1, 1, 4],
+                "day_of_week": [1, 1, 5],
+                "hour": [1, 1,6],
+                "holiday": [1, 0, 2]
+            },
+            "dynamic_feat_real": [],
+            "target": "target"
+        },
+        "demo": {
+            "file_path": "demo.csv",
+            "pkl_path": "pkls/demo.pkl",
+            "csv_kwargs": {},
+            "static_feat": "static",
+            "static_feat_dim": 2,
+            "dynamic_feat_cat": {
+                "year": [1, 1, 2],
+                "month": [1, 1, 2],
+                "day": [1, 1, 5],
+                "holiday": [1, 0, 2]
+            },
+            "dynamic_feat_real": ["dense_1", "dense_2"],
+            "target": "target"
+        },
+        "beijing_pm25": {
+            "time_series_file_path": "beijing_pm25.csv",
             "feature_file_path": "electricity/NewTCNQuantile/features.csv",
             "file_path": "electricity/NewTCNQuantile/feature_prepare.pkl",
             "scaler_file_path": "electricity/NewTCNQuantile/electricity_standard_scaler.pkl",
@@ -39,16 +74,22 @@
 
     "model": {
         "model_dir": "./model_dir",
-        "Test": {
-            "model_name": "LSTM",
-            "hid_dim": 64,
+        "DeepTCN": {
+            "model_name": "DeepTCN",
             "lag": 7,
-            "n_back": 10,
-            "n_fore": 5,
+            "n_back": 72,
+            "n_fore": 24,
+            "norm": true,
+            "sliding_window_dis": 24,
+            "dilation_list": [1,2,4,8],
+            "conv_filter": 11,
+            "conv_ksize": 2,
+            "dilation_depth": 2,
+            "n_repeat": 5,
             "batch_size": 32,
             "callbacks": {
                 "tensorboard": {
-                    "log_dir": "./logs"
+                    "log_dir": "/home/haohy/TSF/deepts/examples/logs"
                 }
             }
         },
@@ -80,20 +121,6 @@
             "num_dense_feat": 3,
             "lag": 7,
             "n_back": 24,
-            "n_fore": 24,
-            "batch_size": 32,
-            "callbacks": {
-                "tensorboard": {
-                    "log_dir": "/home/haohy/TSF/deepts/examples/logs"
-                }
-            }
-        },
-        "DeepTCN": {
-            "model_name": "DeepTCN",
-            "channel_list" : [20, 30, 40],
-            "kernel_size": 3,
-            "lag": 7,
-            "n_back": 168,
             "n_fore": 24,
             "batch_size": 32,
             "callbacks": {

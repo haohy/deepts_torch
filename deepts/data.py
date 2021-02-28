@@ -1,107 +1,180 @@
 import os
-import math
+import pickle
 import numpy as np
 import pandas as pd
-
 import tensorflow as tf
 
 from deepts.feature_column import (SparseFeat, DenseFeat, get_embedding_features, get_dense_features)
 from deepts.utils import set_logging, numpy_input_fn
 
+from IPython import embed
+
 logging = set_logging()
 
-class Dataset:
-    """Base class for `Dataset`.
-
-    Args:
-        df: pandas.DataFrame, columns can't be None.
-        emb_dict: Dictionary, {'day_of_week': 3} represent the column 'day_of_week' is needed to be 
-            embedded and the embedding dimensionality is `3`, the dimensionality `0` represent no 
-            need of embedding, i.e., using one-hot for that column.
-        name: String, name of the dataset.
-        
-    """
-    def __init__(self, df, emb_dict, name):
+class TSDataset:
+    def __init__(self, df, target, static_feat_col=None, dynamic_feat_cat_dict=None, 
+                dynamic_feat_real_col=None, n_back=1, n_fore=1, lag=0, sliding_window_dis=1, 
+                norm=True, pkl_path=None):
         self.df = df
-        self.emb_dict = emb_dict
-        self._name = name
-        self._feature_columns = None
-    
-    def get_raw_data(self):
-        return self.df
-
-    @property
-    def name(self):
-        return self._name
-
-
-class TSDataset(Dataset):
-    def __init__(self, feat_dict, n_back, n_fore, lag, sliding_window_dis, name):
-        self._feat_dict = feat_dict
+        self.target = target
+        self.static_feat_col = static_feat_col
+        self.dynamic_feat_cat_dict = dynamic_feat_cat_dict
+        self.dynamic_feat_real_col = dynamic_feat_real_col
         self.n_back = n_back
         self.n_fore = n_fore
         self.lag = lag
         self.sliding_window_dis = sliding_window_dis
-        self._dynamic_feature = None
-        self._static_dict = None
-        self._time_series = None
-        self._name = name
+        self.norm = norm
+        self.pkl_path = pkl_path
 
-    def check_df(self):
-        if self._static_feature is None or self._dynamic_feature in None:
-            raise ValueError("TSDataset doesn't has dataframe.")
-        if not (self._dynamic_feature.columns == list(self.feat_dict.keys())):
-            raise ValueError("Dynamic columns {} should be same with it's feat_dict {}"
-                            .format(self.df_raw.columns, list(self._feat_dict.keys())))
+        self.static_val_dict = None
+        self.static_feat_num_dict = None
+        self.dynamic_feature_cat = None
+        self.dynamic_feature_real = None
+        self.time_series = None
+        self.lag_feature = None
+        self.scaler = None
+        self.is_cached = False
+        self.check()
 
-    def get_time_series(self, df):
-        self._time_series = df
-        self._static_dict = {col: i for i, col in enumerate(df.columns)}
+    def check(self):
+        all_columns = list(self.dynamic_feat_cat_dict.keys()) + self.dynamic_feat_real_col
+        assert sum(self.df.columns.isin(all_columns)) == len(all_columns),\
+            "df.columns: {}, but input columns {}".format(self.df.columns, all_columns)
+        self.static_val_dict = {k:i for i, k in enumerate(self.df[self.static_feat_col].unique())}
+        self.df[self.static_feat_col] = self.df[self.static_feat_col].apply(lambda x: self.static_val_dict[x])
+        if self.norm:
+            self.df[self.target] = self.min_max_normalize(self.df[self.target].values)
+        if os.path.exists(self.pkl_path):
+            self.is_cached = True
+            self.load_pkl()
+        logging.info("Checked Dataset.")
 
-    def get_features(self, df_feat):
-        self._dynamic_feature = df_feat
+    def get_static_feat_num_dict(self):
+        self.static_feat_ori = self.df[self.static_feat_col]
+        window_size = self.n_back + self.n_fore
+        static_feat_num_dict = {}
+        for static_feat in self.static_feat_ori:
+            static_feat_num_dict[static_feat] = \
+                [(self.df[self.df[self.static_feat_col] == static_feat].shape[0] \
+                    - (window_size-self.sliding_window_dis)) // self.sliding_window_dis,\
+                        self.df[self.df[self.static_feat_col] == static_feat].shape[0]]
+        self.static_feat_num_dict = static_feat_num_dict
+        return static_feat_num_dict
 
-    def from_csv(self, file_path, csv_kwargs):
-        df_csv = pd.read_csv(file_path, **csv_kwargs)
-        self.df_raw = df_csv
+    def get_dynamic_feature_cat(self, period='future'):
+        dynamic_feature_cat = []
+        static_feat_num_dict = self.get_static_feat_num_dict()
+        for static_feat, [num, tail_idx] in static_feat_num_dict.items():
+            static_feat_i = self.df[self.df[self.static_feat_col] == static_feat]\
+                [list(self.dynamic_feat_cat_dict.keys())].values
+            for i in range(num):
+                if period == 'future':
+                    dynamic_feature_cat.append(
+                        static_feat_i[tail_idx-(i+1)*self.n_fore: tail_idx-i*self.n_fore]
+                    )
+                elif period == 'backward':
+                    dynamic_feature_cat.append(
+                        static_feat_i[tail_idx-self.n_back-(i+1)*self.n_fore: tail_idx-(i+1)*self.n_fore]
+                    )
+                elif period == 'all':
+                    dynamic_feature_cat.append(
+                        static_feat_i[tail_idx-self.n_back-self.n_fore-i*self.n_fore: tail_idx-i*self.n_fore]
+                    )
+        self.dynamic_feature_cat = np.stack(dynamic_feature_cat, axis=0)
+        return self.dynamic_feature_cat
 
-    def df_to_dataset(self, n_back, n_fore, lag):
-        self.check_df()
-        static_cols = [k for k, v in self._feat_dict.items() if v[0] == 0]
-        dynamic_cols = [k for k, v in self._feat_dict.items() if v[0] == 1]
-        
-        
+    def get_dynamic_feature_real(self, period='future'):
+        dynamic_feature_real = []
+        static_feat_num_dict = self.get_static_feat_num_dict()
+        for static_feat, [num, tail_idx] in static_feat_num_dict.items():
+            static_feat_i_df = self.df[self.df[self.static_feat_col] == static_feat] \
+                [self.dynamic_feat_real_col]
+            static_feat_i = pd.concat(
+                [static_feat_i_df, self.get_lag_features(self.df[self.target], self.lag)], axis=1).values
+            for i in range(num):
+                if period == 'future':
+                    dynamic_feature_real.append(
+                        static_feat_i[tail_idx-(i+1)*self.n_fore: tail_idx-i*self.n_fore, :]
+                    )
+                elif period == 'backward':
+                    dynamic_feature_real.append(
+                        static_feat_i[tail_idx-self.n_back-(i+1)*self.n_fore: tail_idx-(i+1)*self.n_fore, :]
+                    )
+                elif period == 'all':
+                    dynamic_feature_real.append(
+                        static_feat_i[tail_idx-self.n_back-self.n_fore-i*self.n_fore: tail_idx-i*self.n_fore, :]
+                    )
+        self.dynamic_feature_real = np.stack(dynamic_feature_real, axis=0)
+        return self.dynamic_feature_real
+
+    def get_time_series(self, period='future'):
+        time_series = []
+        static_feat_num_dict = self.get_static_feat_num_dict()
+        for static_feat, [num, tail_idx] in static_feat_num_dict.items():
+            static_feat_i = self.df[self.df[self.static_feat_col] == static_feat] \
+                [self.target].values
+            for i in range(num):
+                if period == 'future':
+                    time_series.append(
+                        static_feat_i[tail_idx-(i+1)*self.n_fore: tail_idx-i*self.n_fore]
+                    )
+                elif period == 'backward':
+                    time_series.append(
+                        static_feat_i[tail_idx-self.n_back-(i+1)*self.n_fore: tail_idx-(i+1)*self.n_fore]
+                    )
+                elif period == 'all':
+                    time_series.append(
+                        static_feat_i[tail_idx-self.n_back-self.n_fore-i*self.n_fore: tail_idx-i*self.n_fore]
+                    )
+        self.time_series = tf.convert_to_tensor(np.stack(time_series, axis=0), dtype=tf.float32)
+        return self.time_series
+
+    def get_lag_features(self, ts, lag):
+        columns=['lag_'+str(i) for i in range(lag)]
+        lag_feature = pd.DataFrame(columns=columns)
+        for i in range(lag):
+            lag_feature['lag_'+str(i)] = ts.shift(i, fill_value=0.0)
+        lag_feature.shift(1, fill_value=0.0)
+        self.lag_feature = lag_feature
+        return lag_feature
+
+    def min_max_normalize(self, values):
+        assert type(values) == np.ndarray, "Got values of type {}, expected type \
+            `numpy.ndarray`".format(type(values))
+        shape_ori = values.shape
+        values = values.reshape(-1, 1)
+        from sklearn.preprocessing import MinMaxScaler
+        scaler = MinMaxScaler(feature_range=(0, 1))
+        self.scaler = scaler.fit(values)
+        values_normalized = self.scaler.transform(values)
+        logging.info("Y's data_min: {}, data_max: {}".format(
+            self.scaler.data_min_, self.scaler.data_max_))
+        return values_normalized.reshape(shape_ori)
+
+    def save_pkl(self):
+        data_dict = {
+            'static_feat_num_dict': self.static_feat_num_dict,
+            'dynamic_feature_cat': self.dynamic_feature_cat,
+            'dynamic_feature_real': self.dynamic_feature_real,
+            'time_series': self.time_series,
+            'lag_feature': self.lag_feature
+        }
+        with open(self.pkl_path, 'wb') as f:
+            pickle.dump(data_dict, f)
+        logging.info("Saved data!")
+
+    def load_pkl(self):
+        with open(self.pkl_path, 'rb') as f:
+            data_dict = pickle.load(f)
+        self.static_feat_num_dict = data_dict['static_feat_num_dict']
+        self.dynamic_feature_cat = data_dict['dynamic_feature_cat']
+        self.dynamic_feature_real = data_dict['dynamic_feature_real']
+        self.time_series = data_dict['time_series']
+        self.lag_feature = data_dict['lag_feature']
+        logging.info("Load data!")
     
-    def get_sparse_feat_cols(self, feat_col_dict):
-        feat_cols = []
-        for key, val in feat_col_dict:
-            feat_cols.append(SparseFeat(key, val[0], val[2], val[3], val[4], 'int64'))
-        return feat_cols
-
-    def get_dense_feat_cols(self, feat_col_dict):
-        feat_cols = []
-        for key, val in feat_col_dict:
-            feat_cols.append(DenseFeat(key, val[0], val[2], val[4], 'float32'))
-        return feat_cols
-
-    def get_features(self):
-        sparse_feat_cols, dense_feat_cols = [], []
-        sparse_feat_dict = {k: v for k, v in self._feat_cols.items() if v[1] == 1}
-        dense_feat_dict = {k: v for k, v in self._feat_cols.items() if v[1] == 0}
-        sparse_feat_cols = self.get_sparse_feat_cols(sparse_feat_dict)
-        dense_feat_cols = self.get_dense_feat_cols(dense_feat_dict)
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def feat_dict(self):
-        return self._feat_dict
-
-    @property
-    def target_col(self):
-        return self._target_col
+    
 
 
 # n_fore = input_dynamic_emb.shape[1]
@@ -117,8 +190,8 @@ class TSDataset(Dataset):
 # input_store = tf.tile(store_embed[:,0:1,:], [1, 168, 1])    # input_store: [batch_size, 168, 10]
 
 
-class DeeptsData(Dataset):
-    def __init__(self, X, Y, feature_columns, name, n_back=1, n_fore=1, lag=0):
+class DeeptsData:
+    def __init__(self, X, Y, feature_columns, n_back=1, n_fore=1, lag=0):
         self.X = X
         self.Y = Y
         self.feature_columns = feature_columns
@@ -126,7 +199,6 @@ class DeeptsData(Dataset):
         self.n_fore = n_fore
         self.lag = lag
         self.scaler = None
-        super(DeeptsData, self).__init__(name)
     
     def get_raw_data(self):
         return self.X, self.Y
@@ -208,11 +280,9 @@ class DeeptsData(Dataset):
 
         return input_fn
 
-def dataset_split(x, y, ratio_list=[6, 2, 2]):
+def dataset_split(x, ratio_list=[6, 2, 2]):
     ratio_list = np.array([0.0] + ratio_list) / sum(ratio_list)
-    index_list = list(map(int, np.cumsum(ratio_list) * len(y)))
+    index_list = list(map(int, np.cumsum(ratio_list) * len(x)))
     train_slice, valid_slice, test_slice = [slice(index_list[i], index_list[i+1]) \
                                             for i in range(len(index_list)-1)]
-    return x[train_slice], y[train_slice],\
-        x[valid_slice], y[valid_slice],\
-        x[test_slice], y[test_slice]
+    return x[train_slice], x[valid_slice], x[test_slice]
