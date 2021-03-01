@@ -1,9 +1,10 @@
 {
     "dataset": {
         "dir_root": "/home/haohy/TSF/deepts/examples/data",
+        "record_file": "/home/haohy/TSF/deepts/examples/results/results.csv",
         "bike_hour": {
             "file_path": "bike_hour.csv",
-            "pkl_path": "pkls/bike_hour.pkl",
+            "pkl_path": "pkls/bike_hour_all.pkl",
             "csv_kwargs": {},
             "static_feat": "static",
             "static_feat_dim": 2,
@@ -110,6 +111,7 @@
             "n_back": 48,
             "n_fore": 24,
             "norm": true,
+            "epochs": 200,
             "sliding_window_dis": 24,
             "dilation_list": [1,2,4,8],
             "conv_filter": 11,
@@ -126,9 +128,10 @@
         "DeepTCN": {
             "model_name": "DeepTCN",
             "lag": 7,
-            "n_back": 72,
+            "n_back": 48,
             "n_fore": 24,
             "norm": true,
+            "epochs": 200,
             "sliding_window_dis": 24,
             "dilation_list": [1,2,4,8],
             "conv_filter": 11,

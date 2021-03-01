@@ -16,7 +16,7 @@ from deepts.models import DeepTCN
 from deepts.data import TSDataset, get_dataloader
 from deepts.utils import get_callbacks
 from deepts.metrics import MASE, ND, NRMSE
-from examples.utils import set_logging, save_predictions, plot_predictions
+from examples.utils import set_logging, save_predictions, plot_predictions, record
 
 logging = set_logging()
 from IPython import embed
@@ -34,6 +34,7 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name):
     n_back = config['n_back']
     n_fore = config['n_fore']
     norm = config['norm']
+    epochs = config['epochs']
     sliding_window_dis = config['sliding_window_dis']
     dilation_list = config['dilation_list']
     conv_filter = static_feat_dim + 1
@@ -43,7 +44,8 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name):
     batch_size = config['batch_size']
     config_callbacks = config['callbacks']
     metrics = [ND(), NRMSE()]
-    tag = model_name+'_'+ds_name+'_'+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+    now = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+    tag = model_name+'_'+ds_name+'_'+now
 
     df = pd.read_csv(os.path.join(config_dataset['dir_root'], config_dataset[ds_name]['file_path']), 
                     **config_dataset[ds_name]['csv_kwargs'])
@@ -65,10 +67,10 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name):
         loss=[Huber()], 
         metrics=metrics,
     )
-    model.fit(
+    history = model.fit(
         x_train, y_train, 
         batch_size=batch_size, 
-        epochs=3,
+        epochs=epochs,
         validation_data=(x_valid, y_valid),
         callbacks=callback_list
     )
@@ -82,9 +84,18 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name):
     # save results
     y_back_inverse = dataset.scaler.inverse_transform(x_test[0].numpy())
     y_true_inverse = dataset.scaler.inverse_transform(y_test.numpy())
-    y_pred_inverse = y_pred
+    y_pred_inverse = dataset.scaler.inverse_transform(y_pred)
     filename = save_predictions(y_back_inverse, y_true_inverse, y_pred_inverse, tag)
     plot_predictions(filename, [0, int(len(y_pred)/2), -1])
+
+    note = "doesn't include dynamic feature backward."
+    config.update({'datetime': now,
+        'nd_valid': round(history.history['val_normalized_deviation'][-1], 6),
+        'nrmse_valid': round(history.history['val_normalized_RMSE'][-1], 6),
+        'nd_test': ND()(y_test.numpy(), y_pred).numpy(),
+        'nrmse_test': NRMSE()(y_test.numpy(), y_pred).numpy(),
+        'note': note})
+    record(config_dataset['record_file'], config)
     logging.info('Finished.')
 
 
@@ -93,4 +104,4 @@ if __name__ == '__main__':
         config_all = json.load(conf)
     config_dataset = config_all['dataset']
     config_model = config_all['model']
-    TSF_DeepTCN(config_model, config_dataset, 'DeepTCN', 'demo')
+    TSF_DeepTCN(config_model, config_dataset, 'DeepTCN', 'bike_hour')

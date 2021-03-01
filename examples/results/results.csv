@@ -1,0 +1,5 @@
+datetime,batch_size,callbacks,conv_filter,conv_ksize,dilation_depth,dilation_list,epochs,lag,model_name,n_back,n_fore,n_repeat,sliding_window_dis,norm,nrmse_test,nd_test,nd_valid,nrmse_valid,note
+2021_03_01_13_02_50,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,DeepTCN,72,24,5,24,1,0.804784477,0.541359782,,,
+2021_03_01_14_31_55,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,DeepTCN,48,24,5,24,1,0.676872611,0.42584604,,,doesn't include dynamic feature backward.
+2021_03_01_14_43_23,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,DeepTCN,48,24,5,24,1,0.746958077,0.525842488,,,include dynamic feature backward.
+2021_03_01_15_03_18,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,DeepTCN,48,24,5,24,1,0.555059969,0.371607274,0.266521,0.381196,doesn't include dynamic feature backward.

@@ -2,6 +2,7 @@ import os
 import pickle
 import datetime
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
 save_dir = './examples/results/'
@@ -14,8 +15,9 @@ def set_logging():
         format='[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s')
     return logging
 
+logging = set_logging()
+
 def save_predictions(y_back, y_true, y_pred, tag):
-    logging = set_logging()
     test = {
         'y_back': y_back,
         'y_true': y_true,
@@ -29,14 +31,12 @@ def save_predictions(y_back, y_true, y_pred, tag):
     return filename
 
 def load_predictions(filename):
-    logging = set_logging()
     with open(filename, 'rb') as f:
         testset = pickle.load(f)
     logging.info('Load predicitons!')
     return testset
 
 def plot_predictions(filename, ts_index):
-    logging = set_logging()
     fig, axes= plt.subplots(len(ts_index), 1, figsize=(8, 2+2*len(ts_index)))
     testset = load_predictions(filename)
     n_back = len(testset['y_back'][0])
@@ -52,3 +52,11 @@ def plot_predictions(filename, ts_index):
     plt.close()
     logging.info("Plot predictions and the figure saved!")
     
+def record(filename, record_dict):
+    if os.path.isfile(filename):
+        df = pd.read_csv(filename, header=0)
+    else:
+        df = pd.DataFrame()
+    df = df.append(record_dict, ignore_index=True)
+    df.to_csv(filename, index=False)
+    logging.info("Saved results.")
