@@ -5,6 +5,7 @@ import pandas as pd
 import tensorflow as tf
 
 from deepts.feature_column import (SparseFeat, DenseFeat, get_embedding_features, get_dense_features)
+from deepts.layers import static_embedding, dynamic_feature_cat_embedding
 from deepts.utils import set_logging, numpy_input_fn
 
 from IPython import embed
@@ -62,7 +63,7 @@ class TSDataset:
         self.static_feat_num_dict = static_feat_num_dict
         return static_feat_num_dict
 
-    def get_dynamic_feature_cat(self, period='future'):
+    def get_dynamic_feature_cat(self, period='all'):
         dynamic_feature_cat = []
         static_feat_num_dict = self.get_static_feat_num_dict()
         for static_feat, [num, tail_idx] in static_feat_num_dict.items():
@@ -173,6 +174,7 @@ class TSDataset:
         self.time_series = data_dict['time_series']
         self.lag_feature = data_dict['lag_feature']
         logging.info("Load data!")
+    
     
     
 
@@ -286,3 +288,34 @@ def dataset_split(x, ratio_list=[6, 2, 2]):
     train_slice, valid_slice, test_slice = [slice(index_list[i], index_list[i+1]) \
                                             for i in range(len(index_list)-1)]
     return x[train_slice], x[valid_slice], x[test_slice]
+
+def get_dataloader(dataset, dynamic_feat_cat_dict, n_back, n_fore, static_feat_dim, dyn_feat_cat_kw='future'):
+    if not dataset.is_cached:
+        dynamic_feature_cat = dataset.get_dynamic_feature_cat(period=dyn_feat_cat_kw)
+        static_feat_num_dict = dataset.get_static_feat_num_dict()
+        time_series = dataset.get_time_series(period='all')
+        dataset.save_pkl()
+    else:
+        dataset.load_pkl()
+        dynamic_feature_cat = dataset.dynamic_feature_cat
+        static_feat_num_dict = dataset.static_feat_num_dict
+        time_series = dataset.time_series
+    static_feat = static_embedding(static_feat_num_dict, n_back, n_fore, 'all', static_feat_dim)
+    dynamic_feature_cat_embed = dynamic_feature_cat_embedding(dynamic_feature_cat, dynamic_feat_cat_dict)
+    ts_back, ts_fore = time_series[:, :n_back], time_series[:, n_back:]
+    ts_back_train, ts_back_valid, ts_back_test = dataset_split(ts_back)
+    static_feat_train, static_feat_valid, static_feat_test = dataset_split(static_feat)
+    dynamic_feature_cat_embed_train, dynamic_feature_cat_embed_valid, dynamic_feature_cat_embed_test\
+        = dataset_split(dynamic_feature_cat_embed)
+    ts_fore_train, ts_fore_valid, ts_fore_test = dataset_split(ts_fore)
+
+    x_train = [ts_back_train, static_feat_train, dynamic_feature_cat_embed_train]
+    y_train = ts_fore_train
+
+    x_valid = [ts_back_valid, static_feat_valid, dynamic_feature_cat_embed_valid]
+    y_valid = ts_fore_valid
+    
+    x_test = [ts_back_test, static_feat_test, dynamic_feature_cat_embed_test]
+    y_test = ts_fore_test
+
+    return x_train, y_train, x_valid, y_valid, x_test, y_test

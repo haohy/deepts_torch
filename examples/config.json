@@ -69,11 +69,60 @@
                 "hour": [1, 1, 1, 4],
                 "holiday": [1, 1, 0, 2]
             }
+        },
+        "demo_old": {
+            "file_path": "demo.csv",
+            "csv_kwargs": {},
+            "sparse_col": {
+                "year": 0,
+                "day": 5,
+                "month": 0,
+                "holiday": 0
+            },
+            "dense_col": [
+                "dense_1", "dense_2"
+            ],
+            "target": "target"
+        },
+        "bike_hour_old": {
+            "file_path": "bike_hour.csv",
+            "csv_kwargs": {
+                "index_col": 0
+            },
+            "sparse_col": {
+                "season": 0,
+                "holiday": 0,
+                "workingday": 5,
+                "weathersit": 0
+            },
+            "dense_col": [
+                "weekday", "yr", "mnth", "hr", "temp", "atemp", "hum", "windspeed", "casual", "registered"
+            ],
+            "target": "cnt"
         }
     },
 
     "model": {
         "model_dir": "./model_dir",
+        "DeepTCN2": {
+            "model_name": "DeepTCN",
+            "lag": 7,
+            "n_back": 48,
+            "n_fore": 24,
+            "norm": true,
+            "sliding_window_dis": 24,
+            "dilation_list": [1,2,4,8],
+            "conv_filter": 11,
+            "conv_ksize": 2,
+            "dilation_depth": 2,
+            "n_repeat": 5,
+            "batch_size": 32,
+            "callbacks": {
+                "tensorboard": {
+                    "log_dir": "/home/haohy/TSF/deepts/examples/logs"
+                }
+            }
+        },
         "DeepTCN": {
             "model_name": "DeepTCN",
             "lag": 7,

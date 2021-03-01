@@ -73,4 +73,4 @@ if __name__ == '__main__':
         config_all = json.load(conf)
     config_dataset = config_all['dataset']
     config_model = config_all['model']
-    TSF_LSTM(config_model, config_dataset, 'LSTM', 'demo_old')
+    TSF_LSTM(config_model, config_dataset, 'LSTM', 'bike_hour_old')

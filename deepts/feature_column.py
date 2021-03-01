@@ -6,50 +6,50 @@ import tensorflow as tf
 from deepts.layers import get_embedding_layer
 
 
-class SparseFeat(namedtuple('SparseFeat',
-                            ['name', 'is_future', 'is_embed', 'dimension', 'dtype'])):
-    __slot__ = ()
-
-    def __new__(cls, name, is_future, is_embed, dimension, dtype):
-        
-        return super(SparseFeat, cls).__new__(cls, name, is_future, is_embed, dimension, dtype)
-
-    def __hash__(self):
-        return self.name.__hash__()
-
-
-class DenseFeat(namedtuple('DenseFeat',
-                            ['name', 'is_future', 'dimension', 'dtype'])):
-    __slot__ = ()
-
-    def __new__(cls, name, is_future, dimension=1, dtype='float32'):
-        return super(DenseFeat, cls).__new__(cls, name, is_future, dimension, dtype)
-
-    def __hash__(self):
-        return self.name.__hash__()
-
-
 # class SparseFeat(namedtuple('SparseFeat',
-#                             ['name', 'vocab_size', 'dtype', 'embed_dim'])):
+#                             ['name', 'is_future', 'is_embed', 'dimension', 'dtype'])):
 #     __slot__ = ()
 
-#     def __new__(cls, name, vocab_size, dtype, embed_dim):
+#     def __new__(cls, name, is_future, is_embed, dimension, dtype):
         
-#         return super(SparseFeat, cls).__new__(cls, name, vocab_size, dtype, embed_dim)
+#         return super(SparseFeat, cls).__new__(cls, name, is_future, is_embed, dimension, dtype)
 
 #     def __hash__(self):
 #         return self.name.__hash__()
 
 
 # class DenseFeat(namedtuple('DenseFeat',
-#                             ['name', 'dimension', 'dtype'])):
+#                             ['name', 'is_future', 'dimension', 'dtype'])):
 #     __slot__ = ()
 
-#     def __new__(cls, name, dimension=1, dtype='float32'):
-#         return super(DenseFeat, cls).__new__(cls, name, dimension, dtype)
+#     def __new__(cls, name, is_future, dimension=1, dtype='float32'):
+#         return super(DenseFeat, cls).__new__(cls, name, is_future, dimension, dtype)
 
 #     def __hash__(self):
 #         return self.name.__hash__()
+
+
+class SparseFeat(namedtuple('SparseFeat',
+                            ['name', 'vocab_size', 'dtype', 'embed_dim'])):
+    __slot__ = ()
+
+    def __new__(cls, name, vocab_size, dtype, embed_dim):
+        
+        return super(SparseFeat, cls).__new__(cls, name, vocab_size, dtype, embed_dim)
+
+    def __hash__(self):
+        return self.name.__hash__()
+
+
+class DenseFeat(namedtuple('DenseFeat',
+                            ['name', 'dimension', 'dtype'])):
+    __slot__ = ()
+
+    def __new__(cls, name, dimension=1, dtype='float32'):
+        return super(DenseFeat, cls).__new__(cls, name, dimension, dtype)
+
+    def __hash__(self):
+        return self.name.__hash__()
 
 
 # class SparseFeat(namedtuple('SparseFeat',

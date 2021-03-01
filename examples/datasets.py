@@ -21,7 +21,7 @@ def get_raw_df(config, ds_name, *args, **kwargs):
     for col, embed_dim in sparse_col.items():
         vocab_size = len(df_raw[col].unique())
         feature_columns.append(SparseFeat('sparse_'+col, vocab_size, 'int64', embed_dim))
-        data_numpy_all['sparse_' + col] = df_raw[col].values
+        data_numpy_all['sparse_' + col] = df_raw[col].values - df_raw[col].values.min()
     for col in dense_col:
         feature_columns.append(DenseFeat('dense_' + col, 1, 'float32'))
         data_numpy_all['dense_' + col] = df_raw[col].values

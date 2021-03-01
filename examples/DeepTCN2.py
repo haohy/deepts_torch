@@ -12,7 +12,7 @@ import tensorflow as tf
 from tensorflow.keras.losses import Huber
 from tensorflow.keras.metrics import MeanAbsoluteError, MeanAbsolutePercentageError
 
-from deepts.models import DeepTCN
+from deepts.models import DeepTCN2
 from deepts.data import TSDataset, get_dataloader
 from deepts.utils import get_callbacks
 from deepts.metrics import MASE, ND, NRMSE
@@ -36,7 +36,6 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name):
     norm = config['norm']
     sliding_window_dis = config['sliding_window_dis']
     dilation_list = config['dilation_list']
-    conv_filter = static_feat_dim + 1
     conv_ksize = config['conv_ksize']
     dilation_depth = config['dilation_depth']
     n_repeat = config['n_repeat']
@@ -52,9 +51,10 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name):
                 n_back, n_fore, lag, sliding_window_dis, norm, pkl_path)
 
     x_train, y_train, x_valid, y_valid, x_test, y_test = get_dataloader(dataset, dynamic_feat_cat_dict,
-                                                                    n_back, n_fore, static_feat_dim)
+        n_back, n_fore, static_feat_dim, dyn_feat_cat_kw='all')
 
-    model = DeepTCN(n_back, n_fore, dilation_list, conv_filter, conv_ksize, dilation_depth, 
+    conv_filter = static_feat_dim + x_train[2].shape[-1] + 1
+    model = DeepTCN2(n_back, n_fore, dilation_list, conv_filter, conv_ksize, dilation_depth, 
             n_repeat, x_train[1].shape[-1], x_train[2].shape[-1])
 
     callback_list = get_callbacks(config_callbacks, tag)
@@ -65,24 +65,22 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name):
         loss=[Huber()], 
         metrics=metrics,
     )
+
     model.fit(
         x_train, y_train, 
         batch_size=batch_size, 
-        epochs=3,
+        epochs=100,
         validation_data=(x_valid, y_valid),
         callbacks=callback_list
     )
     print("{} test train pass!".format(model_name))
 
-    # dataset, x: [batch_size, n_back, n_feature], y: [batch_size, 1, n_fore]
-    # y_pred = model.predict([testX_dt, testY2_dt])
-    
     y_pred = model.predict(x_test)
 
     # save results
     y_back_inverse = dataset.scaler.inverse_transform(x_test[0].numpy())
     y_true_inverse = dataset.scaler.inverse_transform(y_test.numpy())
-    y_pred_inverse = y_pred
+    y_pred_inverse = dataset.scaler.inverse_transform(y_pred)
     filename = save_predictions(y_back_inverse, y_true_inverse, y_pred_inverse, tag)
     plot_predictions(filename, [0, int(len(y_pred)/2), -1])
     logging.info('Finished.')
@@ -93,4 +91,4 @@ if __name__ == '__main__':
         config_all = json.load(conf)
     config_dataset = config_all['dataset']
     config_model = config_all['model']
-    TSF_DeepTCN(config_model, config_dataset, 'DeepTCN', 'demo')
+    TSF_DeepTCN(config_model, config_dataset, 'DeepTCN2', 'bike_hour')

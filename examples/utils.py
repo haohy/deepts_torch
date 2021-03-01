@@ -14,14 +14,14 @@ def set_logging():
         format='[%(levelname)s %(asctime)s %(filename)s:%(lineno)d] %(message)s')
     return logging
 
-def save_predictions(y_back, y_true, y_pred):
+def save_predictions(y_back, y_true, y_pred, tag):
     logging = set_logging()
     test = {
         'y_back': y_back,
         'y_true': y_true,
         'y_pred': y_pred
     }
-    tag = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+    
     filename = save_dir + tag + '.pkl'
     with open(filename, 'wb') as f:
         pickle.dump(test, f)
@@ -51,3 +51,4 @@ def plot_predictions(filename, ts_index):
     plt.savefig(filename+'.png', format='png')
     plt.close()
     logging.info("Plot predictions and the figure saved!")
+    

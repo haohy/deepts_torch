@@ -1,3 +1,5 @@
+
+import os
 import numpy as np
 
 import tensorflow as tf
@@ -13,7 +15,6 @@ def set_logging():
 
 def build_input_features(feature_columns):
     pass
-
 
 def feature_columns_integer(feature_columns):
     sparse_feature_columns = list(filter(lambda x: isinstance(x, SparseFeat), feature_columns))
@@ -52,15 +53,17 @@ def root_mean_squared_error(labels, predictions, **kwargs):
     else:
         rmse, rmse_update = tf.metrics.root_mean_squared_error(labels, predictions, **kwargs)
 
-def get_callbacks(config):
+def get_callbacks(config, tag):
     if len(config) <= 0:
         return []
     callback_list = []
     if 'tensorboard' in config:
         config_tb = config['tensorboard']
-        callback_list.append(callbacks.TensorBoard(**config_tb))
+        log_dir = os.path.join(config_tb.pop('log_dir'), tag)
+        callback_list.append(callbacks.TensorBoard(log_dir=log_dir, **config_tb))
     elif 'earlystopping' in config:
         config_es = config['earlystopping']
         callback_list.append(callbacks.EarlyStopping(**config_es))
 
     return callback_list if len(callback_list) > 0 else None
+
