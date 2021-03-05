@@ -1,5 +1,24 @@
-datetime,batch_size,callbacks,conv_filter,conv_ksize,dilation_depth,dilation_list,epochs,lag,model_name,n_back,n_fore,n_repeat,sliding_window_dis,norm,nrmse_test,nd_test,nd_valid,nrmse_valid,note
-2021_03_01_13_02_50,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,DeepTCN,72,24,5,24,1,0.804784477,0.541359782,,,
-2021_03_01_14_31_55,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,DeepTCN,48,24,5,24,1,0.676872611,0.42584604,,,doesn't include dynamic feature backward.
-2021_03_01_14_43_23,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,DeepTCN,48,24,5,24,1,0.746958077,0.525842488,,,include dynamic feature backward.
-2021_03_01_15_03_18,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,DeepTCN,48,24,5,24,1,0.555059969,0.371607274,0.266521,0.381196,doesn't include dynamic feature backward.
+datetime,batch_size,callbacks,conv_filter,conv_ksize,dilation_depth,dilation_list,epochs,lag,model_name,n_back,n_fore,n_repeat,sliding_window_dis,norm,time_cost,num_params,nrmse_test,nd_test,nd_valid,nrmse_valid,note
+2021_03_01_13_02_50,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,DeepTCN,72,24,5,24,1,,,0.804784477,0.541359782,,,
+2021_03_01_14_31_55,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,DeepTCN,48,24,5,24,1,,,0.676872611,0.42584604,,,doesn't include dynamic feature backward.
+2021_03_01_14_43_23,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,DeepTCN,48,24,5,24,1,,,0.746958077,0.525842488,,,include dynamic feature backward.
+2021_03_01_15_03_18,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,DeepTCN,48,24,5,24,1,,,0.555059969,0.371607274,0.266521,0.381196,doesn't include dynamic feature backward.
+2021_03_01_15_09_01,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,DeepTCN,48,24,5,24,1,,,0.693052888,0.494497955,0.380761,0.517174,include dynamic feature backward.
+2021_03_01_16_02_35,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,DeepTCN3,48,24,2,24,1,,"44,705",0.680869281,0.477014571,0.331198,0.45387299999999997,include dynamic_feat_real backward.
+2021_03_01_16_13_47,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,DeepTCN3,48,24,2,24,1,2.785786986,"44,705",0.674992681,0.474892914,0.266127,0.377283,include dynamic_feat_real backward.
+2021_03_01_17_01_38,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,LSTM2,48,24,2,24,1,,"3,304",1.1006008390000002,0.8616584540000001,0.639763,0.836989,LSTM using dynamic_feat_cat_emb.
+2021_03_01_17_07_13,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,LSTM2,48,24,2,24,1,,"3,304",0.9809807540000001,0.732377768,0.47973599999999994,0.6587609999999999,LSTM predict multiple horizon directly.
+2021_03_01_22_50_29,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,LSTM2,48,24,2,24,1,,,0.728959203,0.492648542,0.329525,0.456138,LSTM replace multiple Conv1D layers in DeepTCN.
+2021_03_01_22_59_26,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,LSTM2,48,24,2,24,1,,"11,617",0.645934105,0.431467324,0.303332,0.465037,LSTM replace multiple Conv1D layers in DeepTCN.
+2021_03_01_23_06_19,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,LSTM2,48,24,2,24,1,,"28,289",0.5988267660000001,0.41984686299999996,0.24203400000000005,0.34273200000000004,"LSTM replace multiple Conv1D layers in DeepTCN, more parameters."
+2021_03_01_23_15_02,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,LSTM2,48,24,2,24,1,1.863248825,"86,849",0.733268321,0.512208343,0.307215,0.47304399999999996,"LSTM replace multiple Conv1D layers in DeepTCN, hid_dim = 128."
+2021_03_01_23_28_49,32,{'tensorboard': {}},11,2,2,"[1, 2, 4, 8]",200,7,DeepTCN,48,24,5,24,1,,"9,787",0.773688376,0.527970016,0.296311,0.42187299999999994,doesn't include dynamic feature backward.
+2021_03_04_22_00_56,32,{'tensorboard': {'log_dir': '/home/haohy/TSF/deepts_torch/examples/logs'}},11,2,2,"[1, 2, 4, 8]",2,7,DeepTCN3,48,24,2,24,1,,39537,1.478756,1.134329,0.044971,1.115359,custom loss.
+2021_03_04_22_03_03,32,{'tensorboard': {'log_dir': '/home/haohy/TSF/deepts_torch/examples/logs'}},11,2,2,"[1, 2, 4, 8]",100,7,DeepTCN3,48,24,2,24,1,,39537,0.741081,0.506087,0.011699,0.5688810000000001,custom loss.
+2021_03_04_22_12_31,32,{'tensorboard': {'log_dir': '/home/haohy/TSF/deepts_torch/examples/logs'}},11,2,2,"[1, 2, 4, 8]",100,7,DeepTCN3,48,24,2,24,1,,39537,0.93777,0.6377390000000001,0.019565,0.735687,custom loss.
+2021_03_04_22_29_42,32,{'tensorboard': {'log_dir': '/home/haohy/TSF/deepts_torch/examples/logs'}},11,2,2,"[1, 2, 4, 8]",2,7,DeepTCN3,48,24,2,24,1,,39537,1.264025,0.9032319999999999,0.778084,1.2163709999999999,custom loss.
+2021_03_04_22_30_20,32,{'tensorboard': {'log_dir': '/home/haohy/TSF/deepts_torch/examples/logs'}},11,2,2,"[1, 2, 4, 8]",50,7,DeepTCN3,48,24,2,24,1,,39537,0.8999590000000001,0.617445,0.15996300000000002,0.7917069999999999,custom loss.
+2021_03_05_10_00_01,32,{'tensorboard': {'log_dir': '/home/haohy/TSF/deepts_torch/examples/logs'}},11,2,2,"[1, 2, 4, 8]",50,7,DeepTCN3,48,24,2,24,1,,39537,0.687243,0.459783,0.085778,0.592849,custom loss.
+2021_03_05_10_02_57,32,{'tensorboard': {'log_dir': '/home/haohy/TSF/deepts_torch/examples/logs'}},11,2,2,"[1, 2, 4, 8]",200,7,DeepTCN3,48,24,2,24,1,,39537,1.432168,1.0,1.2207370000000002,1.284921,mse and dilate loss.
+2021_03_05_10_08_30,32,{'tensorboard': {'log_dir': '/home/haohy/TSF/deepts_torch/examples/logs'}},11,2,2,"[1, 2, 4, 8]",200,7,DeepTCN3,48,24,2,24,1,,39537,0.758933,0.49681099999999995,-0.00019099999999999998,0.495537,0.6 mse and 0.4 dilate loss.
+2021_03_05_11_03_02,32,{'tensorboard': {'log_dir': '/home/haohy/TSF/deepts_torch/examples/logs'}},11,2,2,"[1, 2, 4, 8]",2,7,DeepTCN3,48,24,2,24,1,,39537,1.145663,0.809551,0.787398,1.120219,test reconstruct.

@@ -1,10 +1,29 @@
 {
     "dataset": {
-        "dir_root": "/home/haohy/TSF/deepts/examples/data",
-        "record_file": "/home/haohy/TSF/deepts/examples/results/results.csv",
+        "dir_root": "/home/haohy/TSF/deepts_torch/examples/data",
+        "record_file": "/home/haohy/TSF/deepts_torch/examples/results/results.csv",
+        "bike_hour_deeptcn3": {
+            "file_path": "bike_hour.csv",
+            "pkl_path": "pkls/bike_hour_deeptcn3.pkl",
+            "csv_kwargs": {},
+            "static_feat": "static",
+            "static_feat_dim": 2,
+            "dynamic_feat_cat": {
+                "season": [1, 1, 2],
+                "yr": [1, 1, 2],
+                "mnth": [1, 1, 3],
+                "weekday": [1, 1, 5],
+                "workingday": [1, 1, 5],
+                "weathersit": [1, 1, 5],
+                "hr": [1, 1,6],
+                "holiday": [1, 0, 2]
+            },
+            "dynamic_feat_real": ["temp", "atemp", "hum", "windspeed", "casual", "registered"],
+            "target": "cnt"
+        },
         "bike_hour": {
             "file_path": "bike_hour.csv",
-            "pkl_path": "pkls/bike_hour_all.pkl",
+            "pkl_path": "pkls/bike_hour_future.pkl",
             "csv_kwargs": {},
             "static_feat": "static",
             "static_feat_dim": 2,
@@ -105,6 +124,46 @@
 
     "model": {
         "model_dir": "./model_dir",
+        "LSTM2": {
+            "model_name": "LSTM2",
+            "lag": 7,
+            "n_back": 48,
+            "n_fore": 24,
+            "norm": true,
+            "epochs": 2,
+            "sliding_window_dis": 24,
+            "dilation_list": [1,2,4,8],
+            "conv_filter": 11,
+            "conv_ksize": 2,
+            "dilation_depth": 2,
+            "n_repeat": 2,
+            "batch_size": 32,
+            "callbacks": {
+                "tensorboard": {
+                    "log_dir": "/home/haohy/TSF/deepts_torch/examples/logs"
+                }
+            }
+        },
+        "DeepTCN3": {
+            "model_name": "DeepTCN3",
+            "lag": 7,
+            "n_back": 48,
+            "n_fore": 24,
+            "norm": true,
+            "epochs": 2,
+            "sliding_window_dis": 24,
+            "dilation_list": [1,2,4,8],
+            "conv_filter": 11,
+            "conv_ksize": 2,
+            "dilation_depth": 2,
+            "n_repeat": 2,
+            "batch_size": 32,
+            "callbacks": {
+                "tensorboard": {
+                    "log_dir": "/home/haohy/TSF/deepts_torch/examples/logs"
+                }
+            }
+        },
         "DeepTCN2": {
             "model_name": "DeepTCN",
             "lag": 7,
@@ -121,7 +180,7 @@
             "batch_size": 32,
             "callbacks": {
                 "tensorboard": {
-                    "log_dir": "/home/haohy/TSF/deepts/examples/logs"
+                    "log_dir": "/home/haohy/TSF/deepts_torch/examples/logs"
                 }
             }
         },
@@ -141,7 +200,7 @@
             "batch_size": 32,
             "callbacks": {
                 "tensorboard": {
-                    "log_dir": "/home/haohy/TSF/deepts/examples/logs"
+                    "log_dir": "/home/haohy/TSF/deepts_torch/examples/logs"
                 }
             }
         },
@@ -154,7 +213,7 @@
             "batch_size": 32,
             "callbacks": {
                 "tensorboard": {
-                    "log_dir": "/home/haohy/TSF/deepts/examples/logs"
+                    "log_dir": "/home/haohy/TSF/deepts_torch/examples/logs"
                 }
             }
         },
@@ -177,7 +236,7 @@
             "batch_size": 32,
             "callbacks": {
                 "tensorboard": {
-                    "log_dir": "/home/haohy/TSF/deepts/examples/logs"
+                    "log_dir": "/home/haohy/TSF/deepts_torch/examples/logs"
                 }
             }
         },
