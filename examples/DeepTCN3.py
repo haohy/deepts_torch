@@ -19,7 +19,7 @@ from deepts.metrics import MASE, ND, NRMSE
 from examples.utils import set_logging, save_predictions, plot_predictions, record
 
 logging = set_logging()
-logger = SummaryWriter('./logs')
+logger = SummaryWriter('./examples/logs')
 device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 from IPython import embed
 
@@ -95,37 +95,51 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name):
             n_repeat, ts_back_concat.shape[-1], x_train[1].shape[-1], x_train[2].shape[-1]+x_train[1].shape[-1])
     num_parameters_train = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-    # criterion = nn.MSELoss()
-    criterion = dilate_loss
-    criterion_mse = nn.MSELoss()
+    patience_len = 10
+    lr = 0.005
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+    # criterion = dilate_loss
+    criterion = nn.SmoothL1Loss()
 
     model.train()
+    loss_val_list = []
     for epoch in range(1, epochs+1):
         loss = 0
+        last_pred = None
         for [input_ts, input_static_emb, input_dynamic_emb], label in train_dataloader:
             optimizer.zero_grad()
             input_ts = input_ts
             input_static_emb = input_static_emb
             input_dynamic_emb = input_dynamic_emb
             y_pred = model(input_ts, input_static_emb, input_dynamic_emb)
-            loss_i = criterion(y_pred, torch.unsqueeze(label, dim=-1), device=device)[0]
+            # loss_i = criterion(y_pred, label, alpha=0, gamma=0.01)
+            loss_i = criterion(y_pred, label)
             
             loss += loss_i.item()
             loss_i.backward()
             optimizer.step()
+
+            last_pred = y_pred
         
+        # print(last_pred[0, :10])
+        # embed(header="dilate loss")
         y_pred_valid = model(*x_valid)
-        loss_val = criterion(y_pred_valid, torch.unsqueeze(y_valid, dim=-1), device=device)[0]
-        nd_valid = ND(y_valid.cpu().detach(), torch.squeeze(y_pred_valid, dim=-1).cpu().detach())
-        nrmse_valid = NRMSE(y_valid.cpu().detach(), torch.squeeze(y_pred_valid, dim=-1).cpu().detach())
+        loss_val = criterion(y_pred_valid, y_valid)
+        nd_valid = ND(y_valid.cpu().detach(), y_pred_valid.cpu().detach())
+        nrmse_valid = NRMSE(y_valid.cpu().detach(), y_pred_valid.cpu().detach())
         logger_note = tag
-        logger.add_scalars('{}/loss_train'.format(logger_note), {'loss_train': loss}, epoch)
+        logger.add_scalars('{}/loss_train'.format(logger_note), {'loss_train': loss/len(train_dataloader)}, epoch)
         logger.add_scalars('{}/loss_val'.format(logger_note), {'loss_val':loss_val}, epoch) 
         logger.add_scalars('{}/nd_valid'.format(logger_note), {'nd_valid': nd_valid}, epoch)
         logger.add_scalars('{}/nrmse_valid'.format(logger_note), {'nrmse_valid':nrmse_valid}, epoch) 
         print("Epoch {}, Train Loss {:.4f}, Valid ND {:.4f}, Valid NRMSE {:.4f}, Valid loss {:.4f}"\
             .format(epoch, loss/len(train_dataloader), nd_valid, nrmse_valid, loss_val.item()))
+
+        if epoch > patience_len and loss_val >= max(loss_val_list[-patience_len:]):
+                lr = lr / 2.
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = lr
+        loss_val_list.append(loss_val)
 
     # dataset, x: [batch_size, n_back, n_feature], y: [batch_size, 1, n_fore]
     # y_pred = model.predict([testX_dt, testY2_dt])
@@ -136,17 +150,17 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name):
     # save results
     y_back_inverse = dataset.scaler.inverse_transform(x_test[0][:,:,0].numpy())
     y_true_inverse = dataset.scaler.inverse_transform(y_test.numpy())
-    y_pred_inverse = dataset.scaler.inverse_transform(torch.squeeze(y_pred, dim=-1).cpu().detach().numpy())
+    y_pred_inverse = dataset.scaler.inverse_transform(y_pred.cpu().detach().numpy())
     filename = save_predictions(y_back_inverse, y_true_inverse, y_pred_inverse, tag)
     plot_predictions(filename, [0, int(len(y_pred)/2), -1])
 
-    note = "test reconstruct."
+    note = "add multiheadattention."
     config.update({'datetime': now,
         'num_params': num_parameters_train,
-        'nd_valid': round(loss_val.item(), 6),
+        'nd_valid': round(float(nd_valid), 6),
         'nrmse_valid': round(float(nrmse_valid), 6),
-        'nd_test': round(float(ND(y_test.cpu().detach(), torch.squeeze(y_pred, dim=-1))), 6),
-        'nrmse_test': round(float(NRMSE(y_test.cpu().detach(), torch.squeeze(y_pred, dim=-1))), 6),
+        'nd_test': round(float(ND(y_test.cpu().detach(), y_pred)), 6),
+        'nrmse_test': round(float(NRMSE(y_test.cpu().detach(), y_pred)), 6),
         'note': note})
     record(config_dataset['record_file'], config)
     logging.info('Finished.')

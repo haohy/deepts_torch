@@ -57,7 +57,7 @@ class futureResidual(nn.Module):
     def forward(self, hidden_emb, input_cov_emb):
         out = F.relu(self.bn1(self.fc1(input_cov_emb)))
         out = self.bn2(self.fc2(out))
-        return F.relu(hidden_emb + out) 
+        return F.relu(out + hidden_emb) 
 
 
 class Decoder(nn.Module):
@@ -68,11 +68,10 @@ class Decoder(nn.Module):
         self.relu1 = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
         self.fc2 = nn.Linear(hid_dim, out_features)
-        self.relu2 = nn.ReLU()
 
     def forward(self, x):
-        out_hid = self.dropout(self.relu1(self.bn(self.fc1(x))))
-        outputs = self.relu2(self.fc2(out_hid))
+        out_hid =self.relu1(self.bn(self.fc1(x)))
+        outputs = self.fc2( self.dropout(out_hid))
         return outputs
 
 
@@ -106,10 +105,13 @@ class DeepTCN3Layer(nn.Module):
             out_features_futureResidual -= 2 * (conv_ksize - 1) * dilation
         
         self.TCN_list = []
+        self.attentions =[]
         for d in self.dilation_list:
             self.TCN_list.append(ResidualTCN(ts_dim+static_dim, self.conv_filter, k=self.conv_ksize, d=d))
+            self.attentions.append(nn.MultiheadAttention(self.conv_filter, 2))
         
         self.decoder_predict = Decoder(out_features_futureResidual*self.conv_filter, 1, 64, 24, 0.2)
+
         self.decoder_res = futureResidual(dynamic_dim, out_features_futureResidual*self.conv_filter)
                        
     def forward(self, input_ts, input_static_emb, input_dynamic_emb):
@@ -118,12 +120,14 @@ class DeepTCN3Layer(nn.Module):
         # input_dynamic_emb: [batch_size, n_fore, dim_total], covariate.
         # preprocess
         output = torch.cat([input_static_emb[:, :self.n_back, :], input_ts], dim=2).permute(0, 2, 1)
-        for tcn_layer in self.TCN_list:
-            output = tcn_layer(output)    
+        for tcn_layer, attn_layer in zip(self.TCN_list, self.attentions):
+            output = tcn_layer(output)
+            output = output.permute(0, 2, 1)
+            output = attn_layer(output, output, output)[0].permute(0, 2, 1)
         output = output.permute(0, 2, 1) # output: [batch_size, n_back, conv_filter]
         output = torch.reshape(output, [output.shape[0], 1, -1])   # output: [batch_size, 1, out_features_futureResidual*conv_filter]
         output = output.repeat([1, self.n_fore, 1])
         # output: [batch_size, n_fore, 11*2], embed_concat: [batch_size, n_fore, dim_total]
         dynamic_emb = torch.cat([input_static_emb[:, -self.n_fore:, :], input_dynamic_emb], dim=2)
         output = self.decoder_predict(self.decoder_res(output, dynamic_emb))  
-        return output   # output: [batch_size, n_fore, 1]
+        return torch.squeeze(output, dim=-1)   # output: [batch_size, n_fore, 1]

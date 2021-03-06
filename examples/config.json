@@ -150,7 +150,7 @@
             "n_back": 48,
             "n_fore": 24,
             "norm": true,
-            "epochs": 2,
+            "epochs": 300,
             "sliding_window_dis": 24,
             "dilation_list": [1,2,4,8],
             "conv_filter": 11,
