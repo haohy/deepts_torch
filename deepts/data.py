@@ -54,9 +54,12 @@ class TSDataset:
         self.check()
 
     def check(self):
-        all_columns = list(self.dynamic_feat_cat_dict.keys()) + self.dynamic_feat_real_col
-        assert sum(self.df.columns.isin(all_columns)) == len(all_columns),\
-            "df.columns: {}, but input columns {}".format(self.df.columns, all_columns)
+        # all_columns = list(self.dynamic_feat_cat_dict.keys()) + self.dynamic_feat_real_col
+        # assert sum(self.df.columns.isin(all_columns)) == len(all_columns),\
+        #     "df.columns: {}, but input columns {}".format(self.df.columns, all_columns)
+        if self.static_feat_col is None:
+            self.df['static'] = 0
+            self.static_feat_col = 'static'
         self.static_val_dict = {k:i for i, k in enumerate(self.df[self.static_feat_col].unique())}
         self.df[self.static_feat_col] = self.df[self.static_feat_col].apply(lambda x: self.static_val_dict[x])
         if self.norm:
@@ -101,6 +104,8 @@ class TSDataset:
         return torch.LongTensor(self.dynamic_feature_cat)
 
     def get_dynamic_feature_real(self, period='future'):
+        if self.dynamic_feat_real_col == None:
+            return None
         dynamic_feature_real = []
         static_feat_num_dict = self.get_static_feat_num_dict()
         for static_feat, [num, tail_idx] in static_feat_num_dict.items():

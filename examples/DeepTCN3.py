@@ -32,18 +32,20 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name):
     dynamic_feat_real_col = config_dataset[ds_name]['dynamic_feat_real']
     pkl_path = os.path.join(config_dataset['dir_root'], config_dataset[ds_name]['pkl_path'])
     static_feat_dim = config_dataset[ds_name]['static_feat_dim']
-    lag = config['lag']
-    n_back = config['n_back']
-    n_fore = config['n_fore']
+    lag = config_dataset[ds_name]['lag']
+    n_back = config_dataset[ds_name]['n_back']
+    n_fore = config_dataset[ds_name]['n_fore']
+    sliding_window_dis = config_dataset[ds_name]['sliding_window_dis']
     norm = config['norm']
     epochs = config['epochs']
-    sliding_window_dis = config['sliding_window_dis']
     dilation_list = config['dilation_list']
+    out_features = config['out_features']
     conv_ksize = config['conv_ksize']
+    hid_dim_fore = config['hid_dim_fore']
+    nheads = config['nheads']
     dilation_depth = config['dilation_depth']
     n_repeat = config['n_repeat']
     batch_size = config['batch_size']
-    config_callbacks = config['callbacks']
     now = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     tag = model_name+'_'+ds_name+'_'+now
 
@@ -54,7 +56,7 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name):
                 n_back, n_fore, lag, sliding_window_dis, norm, pkl_path)
 
     if not dataset.is_cached:
-        dynamic_feature_cat = dataset.get_dynamic_feature_cat(period='future')
+        dynamic_feature_cat = dataset.get_dynamic_feature_cat(period='all')
         dynamic_feature_real = dataset.get_dynamic_feature_real(period='all')
         static_feat_num_dict = dataset.get_static_feat_num_dict()
         time_series = dataset.get_time_series(period='all')
@@ -63,14 +65,14 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name):
         dataset.load_pkl()
         dynamic_feature_cat = dataset.dynamic_feature_cat
         static_feat_num_dict = dataset.static_feat_num_dict
-        dynamic_feature_real = torch.FloatTensor(dataset.dynamic_feature_real)
+        # dynamic_feature_real = torch.FloatTensor(dataset.dynamic_feature_real)
         time_series = dataset.time_series
     static_feat = static_embedding(static_feat_num_dict, n_back, n_fore, 'all', static_feat_dim)
     dynamic_feature_cat_embed = dynamic_feature_cat_embedding(dynamic_feature_cat, dynamic_feat_cat_dict)
     ts_back, ts_fore = time_series[:, :n_back], time_series[:, n_back:]
-    dynamic_feature_real_back = dynamic_feature_real[:, :n_back, :]
-
-    ts_back_concat = torch.cat([torch.unsqueeze(ts_back, dim=-1), dynamic_feature_real_back], dim=-1)
+    # dynamic_feature_real_back = dynamic_feature_real[:, :n_back, :]
+    ts_back_concat = torch.unsqueeze(ts_back, -1)
+    # ts_back_concat = torch.cat([torch.unsqueeze(ts_back, dim=-1), dynamic_feature_real_back], dim=-1)
     ts_back_train, ts_back_valid, ts_back_test = dataset_split(ts_back_concat)
     static_feat_train, static_feat_valid, static_feat_test = dataset_split(static_feat)
     dynamic_feature_cat_embed_train, dynamic_feature_cat_embed_valid, dynamic_feature_cat_embed_test\
@@ -90,9 +92,12 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name):
     valid_dataloader = data.DataLoader(Data(x_valid, y_valid), batch_size)
     test_dataloader = data.DataLoader(Data(x_test, y_test), batch_size)
 
-    conv_filter = static_feat_dim + ts_back_concat.shape[-1]
-    model = DeepTCN3(n_back, n_fore, dilation_list, conv_filter, conv_ksize, dilation_depth, 
-            n_repeat, ts_back_concat.shape[-1], x_train[1].shape[-1], x_train[2].shape[-1]+x_train[1].shape[-1])
+    ts_dim = x_train[0].shape[-1]
+    static_dim = x_train[1].shape[-1]
+    dynamic_dim = x_train[2].shape[-1]
+    print("ts_dim: {}, static_dim: {}, dynamic_dim: {}".format(ts_dim, static_dim, dynamic_dim))
+    model = DeepTCN3(n_back, n_fore, dilation_list, out_features, hid_dim_fore, conv_ksize, nheads, 
+                    dilation_depth, n_repeat, ts_dim, static_dim, dynamic_dim)
     num_parameters_train = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     patience_len = 10
@@ -112,7 +117,7 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name):
             input_static_emb = input_static_emb
             input_dynamic_emb = input_dynamic_emb
             y_pred = model(input_ts, input_static_emb, input_dynamic_emb)
-            # loss_i = criterion(y_pred, label, alpha=0, gamma=0.01)
+            # loss_i = criterion(y_pred, label)
             loss_i = criterion(y_pred, label)
             
             loss += loss_i.item()
@@ -126,14 +131,16 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name):
         y_pred_valid = model(*x_valid)
         loss_val = criterion(y_pred_valid, y_valid)
         nd_valid = ND(y_valid.cpu().detach(), y_pred_valid.cpu().detach())
+        mase_valid = MASE(y_valid.cpu().detach(), y_pred_valid.cpu().detach())
         nrmse_valid = NRMSE(y_valid.cpu().detach(), y_pred_valid.cpu().detach())
         logger_note = tag
         logger.add_scalars('{}/loss_train'.format(logger_note), {'loss_train': loss/len(train_dataloader)}, epoch)
         logger.add_scalars('{}/loss_val'.format(logger_note), {'loss_val':loss_val}, epoch) 
         logger.add_scalars('{}/nd_valid'.format(logger_note), {'nd_valid': nd_valid}, epoch)
+        logger.add_scalars('{}/mase_valid'.format(logger_note), {'mase_valid': mase_valid}, epoch)
         logger.add_scalars('{}/nrmse_valid'.format(logger_note), {'nrmse_valid':nrmse_valid}, epoch) 
-        print("Epoch {}, Train Loss {:.4f}, Valid ND {:.4f}, Valid NRMSE {:.4f}, Valid loss {:.4f}"\
-            .format(epoch, loss/len(train_dataloader), nd_valid, nrmse_valid, loss_val.item()))
+        print("Epoch {}, Train Loss {:.4f}, Valid ND {:.4f}, Valid MASE {:.4f}, Valid NRMSE {:.4f}, Valid loss {:.4f}"\
+            .format(epoch, loss/len(train_dataloader), nd_valid, mase_valid, nrmse_valid, loss_val.item()))
 
         if epoch > patience_len and loss_val >= max(loss_val_list[-patience_len:]):
                 lr = lr / 2.
@@ -154,12 +161,14 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name):
     filename = save_predictions(y_back_inverse, y_true_inverse, y_pred_inverse, tag)
     plot_predictions(filename, [0, int(len(y_pred)/2), -1])
 
-    note = "add multiheadattention."
+    note = "LSTM, Huber loss, traffic"
     config.update({'datetime': now,
         'num_params': num_parameters_train,
         'nd_valid': round(float(nd_valid), 6),
+        'mase_valid': round(float(mase_valid), 6),
         'nrmse_valid': round(float(nrmse_valid), 6),
         'nd_test': round(float(ND(y_test.cpu().detach(), y_pred)), 6),
+        'mase_test': round(float(MASE(y_test.cpu().detach(), y_pred)), 6),
         'nrmse_test': round(float(NRMSE(y_test.cpu().detach(), y_pred)), 6),
         'note': note})
     record(config_dataset['record_file'], config)
@@ -171,4 +180,4 @@ if __name__ == '__main__':
         config_all = json.load(conf)
     config_dataset = config_all['dataset']
     config_model = config_all['model']
-    TSF_DeepTCN(config_model, config_dataset, 'DeepTCN3', 'bike_hour_deeptcn3')
+    TSF_DeepTCN(config_model, config_dataset, 'DeepTCN3', 'traffic')

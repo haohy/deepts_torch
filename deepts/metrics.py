@@ -13,7 +13,7 @@ def MASE(y_true, y_pred, sample_weight=None, period=1, epsilon=1e-10):
     assert list(y_true.shape) == list(y_pred.shape), \
         "y_true's shape {} != y_pred's shape {}.".format(y_true.shape, y_pred.shape)
     assert y_pred.shape[-1] > period, "period can't be larger than n_fore."
-    mae = torch.mean(torch.abs(y_true, y_pred))
+    mae = torch.mean(torch.abs(y_true - y_pred))
     mae_npe = naive_pred_error(y_true, period)
     return mae / (mae_npe + epsilon)
 

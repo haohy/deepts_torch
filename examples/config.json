@@ -2,6 +2,48 @@
     "dataset": {
         "dir_root": "/home/haohy/TSF/deepts_torch/examples/data",
         "record_file": "/home/haohy/TSF/deepts_torch/examples/results/results.csv",
+        "traffic": {
+            "file_path": "traffic_data_in_bits.csv",
+            "pkl_path": "pkls/traffic_data_in_bits.pkl",
+            "csv_kwargs": {},
+            "static_feat": null,
+            "static_feat_dim": 1,
+            "dynamic_feat_cat": {
+                "month": [1, 1, 4],
+                "day": [1, 1, 5],
+                "dayofweek": [1, 1, 3],
+                "daysinmonth": [1, 1, 5],
+                "hour": [1, 1, 5],
+                "minute": [1, 1, 6],
+                "holiday": [1, 0, 2]
+            },
+            "dynamic_feat_real": null,
+            "target": "value",
+            "lag": 12,
+            "n_back": 24,
+            "n_fore": 12,
+            "sliding_window_dis": 12
+        },
+        "NSW2013": {
+            "file_path": "NSW2013.csv",
+            "pkl_path": "pkls/NSW2013.pkl",
+            "csv_kwargs": {},
+            "static_feat": null,
+            "static_feat_dim": 1,
+            "dynamic_feat_cat": {
+                "month": [1, 1, 3],
+                "day": [1, 1, 5],
+                "hour": [1, 1, 6],
+                "minute": [1, 1, 2],
+                "holiday": [1, 0, 2]
+            },
+            "dynamic_feat_real": ["RRP"],
+            "target": "TOTALDEMAND",
+            "lag": 7,
+            "n_back": 48,
+            "n_fore": 24,
+            "sliding_window_dis": 24
+        },
         "bike_hour_deeptcn3": {
             "file_path": "bike_hour.csv",
             "pkl_path": "pkls/bike_hour_deeptcn3.pkl",
@@ -19,11 +61,34 @@
                 "holiday": [1, 0, 2]
             },
             "dynamic_feat_real": ["temp", "atemp", "hum", "windspeed", "casual", "registered"],
-            "target": "cnt"
+            "target": "cnt",
+            "lag": 7,
+            "n_back": 48,
+            "n_fore": 24,
+            "sliding_window_dis": 24
         },
-        "bike_hour": {
+        "PRSA_Data_Wanliu": {
+            "file_path": "PRSA_Data_Wanliu.csv",
+            "pkl_path": "pkls/PRSA_Data_Wanliu.pkl",
+            "csv_kwargs": {},
+            "static_feat": null,
+            "static_feat_dim": 1,
+            "dynamic_feat_cat": {
+                "year": [1, 1, 2],
+                "month": [1, 1, 3],
+                "day": [1, 1, 5],
+                "hour": [1, 1,6]
+            },
+            "dynamic_feat_real": ["PM10", "O3", "TEMP", "WSPM"],
+            "target": "PM2.5",
+            "lag": 7,
+            "n_back": 48,
+            "n_fore": 24,
+            "sliding_window_dis": 24
+        },
+        "bike_hour_dyn_cat_all": {
             "file_path": "bike_hour.csv",
-            "pkl_path": "pkls/bike_hour_future.pkl",
+            "pkl_path": "pkls/bike_hour_dyn_cat_all.pkl",
             "csv_kwargs": {},
             "static_feat": "static",
             "static_feat_dim": 2,
@@ -72,24 +137,6 @@
             "dynamic_feat_real": ["dense_1", "dense_2"],
             "target": "target"
         },
-        "beijing_pm25": {
-            "time_series_file_path": "beijing_pm25.csv",
-            "feature_file_path": "electricity/NewTCNQuantile/features.csv",
-            "file_path": "electricity/NewTCNQuantile/feature_prepare.pkl",
-            "scaler_file_path": "electricity/NewTCNQuantile/electricity_standard_scaler.pkl",
-            "csv_kwargs": {
-                "index_col": 0
-            },
-            "feat_cols": {
-                "columns": ["dense/sparse", "backward/future", "embed/one-hot", "dim/vocab_size"],
-                "year": [1, 1, 1, 2],
-                "month": [1, 1, 1, 2],
-                "day": [1, 1, 1, 5],
-                "day_of_week": [1, 1, 1, 3],
-                "hour": [1, 1, 1, 4],
-                "holiday": [1, 1, 0, 2]
-            }
-        },
         "demo_old": {
             "file_path": "demo.csv",
             "csv_kwargs": {},
@@ -126,12 +173,8 @@
         "model_dir": "./model_dir",
         "LSTM2": {
             "model_name": "LSTM2",
-            "lag": 7,
-            "n_back": 48,
-            "n_fore": 24,
             "norm": true,
             "epochs": 2,
-            "sliding_window_dis": 24,
             "dilation_list": [1,2,4,8],
             "conv_filter": 11,
             "conv_ksize": 2,
@@ -146,23 +189,16 @@
         },
         "DeepTCN3": {
             "model_name": "DeepTCN3",
-            "lag": 7,
-            "n_back": 48,
-            "n_fore": 24,
             "norm": true,
-            "epochs": 300,
-            "sliding_window_dis": 24,
-            "dilation_list": [1,2,4,8],
-            "conv_filter": 11,
+            "epochs": 200,
+            "dilation_list": [1,2,4],
+            "out_features": 12,
+            "hid_dim_fore": 32,
             "conv_ksize": 2,
+            "nheads": 3,
             "dilation_depth": 2,
             "n_repeat": 2,
-            "batch_size": 32,
-            "callbacks": {
-                "tensorboard": {
-                    "log_dir": "/home/haohy/TSF/deepts_torch/examples/logs"
-                }
-            }
+            "batch_size": 32
         },
         "DeepTCN2": {
             "model_name": "DeepTCN",
