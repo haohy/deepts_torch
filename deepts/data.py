@@ -179,7 +179,8 @@ class TSDataset:
             'dynamic_feature_cat': self.dynamic_feature_cat,
             'dynamic_feature_real': self.dynamic_feature_real,
             'time_series': self.time_series,
-            'lag_feature': self.lag_feature
+            'lag_feature': self.lag_feature,
+            'scaler': self.scaler
         }
         with open(self.pkl_path, 'wb') as f:
             pickle.dump(data_dict, f)
@@ -193,6 +194,7 @@ class TSDataset:
         self.dynamic_feature_real = data_dict['dynamic_feature_real']
         self.time_series = data_dict['time_series']
         self.lag_feature = data_dict['lag_feature']
+        self.scaler = data_dict['scaler']
         logging.info("Load data!")
 
 

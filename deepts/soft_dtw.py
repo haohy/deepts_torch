@@ -3,6 +3,8 @@ import torch
 from numba import jit
 from torch.autograd import Function
 
+from IPython import embed
+
 def pairwise_distances(x, y=None):
     '''
     Input: x is a Nxd matrix
@@ -23,9 +25,10 @@ def pairwise_distances(x, y=None):
     return torch.clamp(dist, 0.0, float('inf'))
 
 @jit(nopython = True)
-def compute_softdtw(D, gamma):
+def compute_softdtw(D, gamma, scale):
   N = D.shape[0]
   M = D.shape[1]
+
   R = np.zeros((N + 2, M + 2)) + 1e8
   R[0, 0] = 0
   for j in range(1, M + 1):
@@ -34,9 +37,12 @@ def compute_softdtw(D, gamma):
       r1 = -R[i - 1, j] / gamma
       r2 = -R[i, j - 1] / gamma
       rmax = max(max(r0, r1), r2)
-      rsum = np.exp(r0 - rmax) + np.exp(r1 - rmax) + np.exp(r2 - rmax)
-      softmin = - gamma * (np.log(rsum) + rmax)
-      R[i, j] = D[i - 1, j - 1] + softmin
+      if abs(i-j) <= scale:
+        rsum = np.exp(r0 - rmax) + np.exp(r1 - rmax) + np.exp(r2 - rmax)
+        softmin = - gamma * (np.log(rsum) + rmax)
+        R[i, j] = D[i - 1, j - 1] + softmin
+      else:
+        R[i, j] = 0.0
   return R
 
 @jit(nopython = True)
@@ -59,12 +65,13 @@ def compute_softdtw_backward(D_, R, gamma):
       b = np.exp(b0)
       c = np.exp(c0)
       E[i, j] = E[i + 1, j] * a + E[i, j + 1] * b + E[i + 1, j + 1] * c
+  
   return E[1:N + 1, 1:M + 1]
  
 
 class SoftDTWBatch(Function):
     @staticmethod
-    def forward(ctx, D, gamma = 1.0): # D.shape: [batch_size, N , N]
+    def forward(ctx, D, gamma = 1.0, scale=1.0): # D.shape: [batch_size, N , N]
         dev = D.device
         batch_size,N,N = D.shape
         gamma = torch.FloatTensor([gamma]).to(dev)
@@ -74,7 +81,8 @@ class SoftDTWBatch(Function):
         total_loss = 0
         R = torch.zeros((batch_size, N+2 ,N+2)).to(dev)   
         for k in range(0, batch_size): # loop over all D in the batch    
-            Rk = torch.FloatTensor(compute_softdtw(D_[k,:,:], g_)).to(dev)
+            Rk = torch.FloatTensor(compute_softdtw(D_[k,:,:], g_, scale)).to(dev)
+            # print("RK", Rk)
             R[k:k+1,:,:] = Rk
             total_loss = total_loss + Rk[-2,-2]
         ctx.save_for_backward(D, R, gamma)
@@ -93,7 +101,7 @@ class SoftDTWBatch(Function):
         for k in range(batch_size):         
             Ek = torch.FloatTensor(compute_softdtw_backward(D_[k,:,:], R_[k,:,:], g_)).to(dev)
             E[k:k+1,:,:] = Ek
-
-        return grad_output * E, None
+        
+        return grad_output * E, None, None
 
 

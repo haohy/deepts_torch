@@ -52,8 +52,18 @@ def dynamic_feature_cat_embedding(dynamic_feature_cat, dynamic_feat_cat_dict):
         # try:
         #     feat_cat = dynamic_feature_cat[:, :, i].apply_(lambda x: feat_cat_dict[x])
         # except:
-        feat_embedding[:, :, emb_dim_idx:emb_dim_idx+v[-1]] = emb_layer(torch.LongTensor(feat_cat))
-        
+        if v[1] > 0:
+            feat_embedding[:, :, emb_dim_idx:emb_dim_idx+v[-1]] = emb_layer(torch.LongTensor(feat_cat))
+        else:
+            try:
+                feat_cat = torch.LongTensor(feat_cat)
+                feat_embedding[:, :, emb_dim_idx:emb_dim_idx+v[-1]] = torch.zeros(
+                    feat_cat.shape[0]*feat_cat.shape[1], v[-1])\
+                        .scatter_(1, feat_cat.view(-1, 1), 1)\
+                            .view(feat_cat.shape[0], feat_cat.shape[1], v[-1])
+            except:
+                embed(header="embedding")
+
         emb_dim_idx += v[-1]
         emb_layer_list.append(emb_layer)
     return feat_embedding

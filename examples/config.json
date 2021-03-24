@@ -2,6 +2,28 @@
     "dataset": {
         "dir_root": "/home/haohy/TSF/deepts_torch/examples/data",
         "record_file": "/home/haohy/TSF/deepts_torch/examples/results/results.csv",
+        "traffic_svr": {
+            "file_path": "traffic_data_in_bits.csv",
+            "pkl_path": "pkls/traffic_data_in_bits_svr.pkl",
+            "csv_kwargs": {},
+            "static_feat": null,
+            "static_feat_dim": 1,
+            "dynamic_feat_cat": {
+                "month": [1, 0, 12],
+                "day": [1, 0, 31],
+                "dayofweek": [1, 0, 7],
+                "daysinmonth": [1, 0, 31],
+                "hour": [1, 0, 24],
+                "minute": [1, 0, 60],
+                "holiday": [1, 0, 2]
+            },
+            "dynamic_feat_real": null,
+            "target": "value",
+            "lag": 12,
+            "n_back": 24,
+            "n_fore": 12,
+            "sliding_window_dis": 12
+        },
         "traffic": {
             "file_path": "traffic_data_in_bits.csv",
             "pkl_path": "pkls/traffic_data_in_bits.pkl",
@@ -24,15 +46,36 @@
             "n_fore": 12,
             "sliding_window_dis": 12
         },
-        "NSW2013": {
-            "file_path": "NSW2013.csv",
-            "pkl_path": "pkls/NSW2013.pkl",
+        "TAS2016_svr": {
+            "file_path": "TAS2016.csv",
+            "pkl_path": "pkls/TAS2016_svr.pkl",
+            "csv_kwargs": {},
+            "static_feat": null,
+            "static_feat_dim": 1,
+            "dynamic_feat_cat": {
+                "month": [1, 0, 12],
+                "day": [1, 0, 31],
+                "hour": [1, 0, 24],
+                "minute": [1, 0, 60],
+                "holiday": [1, 0, 2]
+            },
+            "dynamic_feat_real": ["RRP"],
+            "target": "TOTALDEMAND",
+            "lag": 7,
+            "n_back": 48,
+            "n_fore": 24,
+            "sliding_window_dis": 24
+        },
+        "TAS2016": {
+            "file_path": "TAS2016.csv",
+            "pkl_path": "pkls/TAS2016.pkl",
             "csv_kwargs": {},
             "static_feat": null,
             "static_feat_dim": 1,
             "dynamic_feat_cat": {
                 "month": [1, 1, 3],
                 "day": [1, 1, 5],
+                "dayofweek": [1, 1, 3],
                 "hour": [1, 1, 6],
                 "minute": [1, 1, 2],
                 "holiday": [1, 0, 2]
@@ -44,9 +87,100 @@
             "n_fore": 24,
             "sliding_window_dis": 24
         },
-        "bike_hour_deeptcn3": {
+        "bike_hour_svr": {
             "file_path": "bike_hour.csv",
-            "pkl_path": "pkls/bike_hour_deeptcn3.pkl",
+            "pkl_path": "pkls/bike_hour_svr.pkl",
+            "csv_kwargs": {},
+            "static_feat": "static",
+            "static_feat_dim": 2,
+            "dynamic_feat_cat": {
+                "season": [1, 0, 4],
+                "yr": [1, 0, 4],
+                "mnth": [1, 0, 12],
+                "weekday": [1, 0, 7],
+                "workingday": [1, 0, 31],
+                "hr": [1, 0, 24],
+                "holiday": [1, 0, 2]
+            },
+            "dynamic_feat_real": ["temp", "atemp", "hum", "windspeed", "casual", "registered"],
+            "target": "cnt",
+            "lag": 7,
+            "n_back": 48,
+            "n_fore": 24,
+            "sliding_window_dis": 24
+        },
+        "bike_hour_120": {
+            "file_path": "bike_hour.csv",
+            "pkl_path": "pkls/bike_hour_120.pkl",
+            "csv_kwargs": {},
+            "static_feat": "static",
+            "static_feat_dim": 2,
+            "dynamic_feat_cat": {
+                "season": [1, 1, 2],
+                "yr": [1, 1, 2],
+                "mnth": [1, 1, 3],
+                "weekday": [1, 1, 5],
+                "workingday": [1, 1, 5],
+                "weathersit": [1, 1, 5],
+                "hr": [1, 1,6],
+                "holiday": [1, 0, 2]
+            },
+            "dynamic_feat_real": ["temp", "atemp", "hum", "windspeed", "casual", "registered"],
+            "target": "cnt",
+            "lag": 7,
+            "n_back": 120,
+            "n_fore": 24,
+            "sliding_window_dis": 24
+        },
+        "bike_hour_96": {
+            "file_path": "bike_hour.csv",
+            "pkl_path": "pkls/bike_hour_96.pkl",
+            "csv_kwargs": {},
+            "static_feat": "static",
+            "static_feat_dim": 2,
+            "dynamic_feat_cat": {
+                "season": [1, 1, 2],
+                "yr": [1, 1, 2],
+                "mnth": [1, 1, 3],
+                "weekday": [1, 1, 5],
+                "workingday": [1, 1, 5],
+                "weathersit": [1, 1, 5],
+                "hr": [1, 1,6],
+                "holiday": [1, 0, 2]
+            },
+            "dynamic_feat_real": ["temp", "atemp", "hum", "windspeed", "casual", "registered"],
+            "target": "cnt",
+            "lag": 7,
+            "n_back": 96,
+            "n_fore": 24,
+            "sliding_window_dis": 24
+        },
+        "bike_hour_72": {
+            "file_path": "bike_hour.csv",
+            "pkl_path": "pkls/bike_hour_72.pkl",
+            "csv_kwargs": {},
+            "static_feat": "static",
+            "static_feat_dim": 2,
+            "dynamic_feat_cat": {
+                "season": [1, 1, 2],
+                "yr": [1, 1, 2],
+                "mnth": [1, 1, 3],
+                "weekday": [1, 1, 5],
+                "workingday": [1, 1, 5],
+                "weathersit": [1, 1, 5],
+                "hr": [1, 1,6],
+                "holiday": [1, 0, 2]
+            },
+            "dynamic_feat_real": ["temp", "atemp", "hum", "windspeed", "casual", "registered"],
+            "target": "cnt",
+            "lag": 7,
+            "n_back": 72,
+            "n_fore": 24,
+            "sliding_window_dis": 24
+        },
+        "bike_hour": {
+            "file_path": "bike_hour.csv",
+            "pkl_path": "pkls/bike_hour.pkl",
             "csv_kwargs": {},
             "static_feat": "static",
             "static_feat_dim": 2,
@@ -67,9 +201,28 @@
             "n_fore": 24,
             "sliding_window_dis": 24
         },
-        "PRSA_Data_Wanliu": {
-            "file_path": "PRSA_Data_Wanliu.csv",
-            "pkl_path": "pkls/PRSA_Data_Wanliu.pkl",
+        "PRSA_svr": {
+            "file_path": "PRSA.csv",
+            "pkl_path": "pkls/PRSA_svr.pkl",
+            "csv_kwargs": {},
+            "static_feat": null,
+            "static_feat_dim": 1,
+            "dynamic_feat_cat": {
+                "year": [1, 0, 4],
+                "month": [1, 0, 12],
+                "day": [1, 0, 31],
+                "hour": [1, 0, 24]
+            },
+            "dynamic_feat_real": ["PM10", "O3", "TEMP", "WSPM"],
+            "target": "PM2.5",
+            "lag": 7,
+            "n_back": 48,
+            "n_fore": 24,
+            "sliding_window_dis": 24
+        },
+        "PRSA": {
+            "file_path": "PRSA.csv",
+            "pkl_path": "pkls/PRSA.pkl",
             "csv_kwargs": {},
             "static_feat": null,
             "static_feat_dim": 1,
@@ -150,22 +303,6 @@
                 "dense_1", "dense_2"
             ],
             "target": "target"
-        },
-        "bike_hour_old": {
-            "file_path": "bike_hour.csv",
-            "csv_kwargs": {
-                "index_col": 0
-            },
-            "sparse_col": {
-                "season": 0,
-                "holiday": 0,
-                "workingday": 5,
-                "weathersit": 0
-            },
-            "dense_col": [
-                "weekday", "yr", "mnth", "hr", "temp", "atemp", "hum", "windspeed", "casual", "registered"
-            ],
-            "target": "cnt"
         }
     },
 
@@ -190,12 +327,12 @@
         "DeepTCN3": {
             "model_name": "DeepTCN3",
             "norm": true,
-            "epochs": 200,
+            "epochs": 80,
             "dilation_list": [1,2,4],
             "out_features": 12,
             "hid_dim_fore": 32,
             "conv_ksize": 2,
-            "nheads": 3,
+            "nheads": 4,
             "dilation_depth": 2,
             "n_repeat": 2,
             "batch_size": 32

@@ -17,12 +17,25 @@ def MASE(y_true, y_pred, sample_weight=None, period=1, epsilon=1e-10):
     mae_npe = naive_pred_error(y_true, period)
     return mae / (mae_npe + epsilon)
 
-def ND(y_true, y_pred, sample_weight=None, period=1):
-        denominator = torch.sum(torch.abs(y_true))
-        diff = torch.sum(torch.abs(y_true - y_pred))
-        return diff/denominator
+def ND(y_true, y_pred):
+    denominator = torch.sum(torch.abs(y_true))
+    diff = torch.sum(torch.abs(y_true - y_pred))
+    return diff/denominator
 
-def NRMSE(y_true, y_pred, sample_weight=None, period=1):
-        denominator = torch.mean(y_true)
-        diff = torch.sqrt(torch.mean(((y_pred - y_true)**2)))
-        return diff/denominator
+def NRMSE(y_true, y_pred):
+    denominator = torch.mean(y_true)
+    diff = torch.sqrt(torch.mean(((y_pred - y_true)**2)))
+    return diff/denominator
+
+def SMAPE(y_true, y_pred):
+    smape = torch.mean(torch.abs((2*(y_true-y_pred) / (y_true+y_pred))))
+    return smape
+
+def MAE(y_true, y_pred):
+    mae = torch.mean(torch.abs(y_true - y_pred))
+    return mae
+
+def MSE(y_true, y_pred):
+    mse = torch.mean(torch.abs(y_true - y_pred)**2)
+    return mse
+
