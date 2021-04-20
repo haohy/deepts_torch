@@ -25,24 +25,44 @@ def pairwise_distances(x, y=None):
     return torch.clamp(dist, 0.0, float('inf'))
 
 @jit(nopython = True)
+def abs_func(x, epsilon=0):
+    return np.sqrt(x**2 + epsilon)
+
+@jit(nopython = True)
+def min_func(x, y, epsilon=1e-10):
+    return -(-x + -y + abs_func(-x + y, epsilon))/2
+
+@jit(nopython = True)
 def compute_softdtw(D, gamma, scale):
   N = D.shape[0]
   M = D.shape[1]
 
   R = np.zeros((N + 2, M + 2)) + 1e8
   R[0, 0] = 0
+
+  # softmins = []
   for j in range(1, M + 1):
     for i in range(1, N + 1):
+
+      # embed(header="compute softdtw")
+
       r0 = -R[i - 1, j - 1] / gamma
       r1 = -R[i - 1, j] / gamma
       r2 = -R[i, j - 1] / gamma
+      # r0 = R[i - 1, j - 1]
+      # r1 = R[i - 1, j]
+      # r2 = R[i, j - 1]
       rmax = max(max(r0, r1), r2)
       if abs(i-j) <= scale:
         rsum = np.exp(r0 - rmax) + np.exp(r1 - rmax) + np.exp(r2 - rmax)
         softmin = - gamma * (np.log(rsum) + rmax)
+        # softmin = min_func(min_func(r0, r1), r2)
         R[i, j] = D[i - 1, j - 1] + softmin
+        # softmins.append(softmin)
       else:
         R[i, j] = 0.0
+  # print(np.mean(softmins))
+
   return R
 
 @jit(nopython = True)
@@ -82,7 +102,6 @@ class SoftDTWBatch(Function):
         R = torch.zeros((batch_size, N+2 ,N+2)).to(dev)   
         for k in range(0, batch_size): # loop over all D in the batch    
             Rk = torch.FloatTensor(compute_softdtw(D_[k,:,:], g_, scale)).to(dev)
-            # print("RK", Rk)
             R[k:k+1,:,:] = Rk
             total_loss = total_loss + Rk[-2,-2]
         ctx.save_for_backward(D, R, gamma)

@@ -327,7 +327,7 @@
         "DeepTCN3": {
             "model_name": "DeepTCN3",
             "norm": true,
-            "epochs": 80,
+            "epochs": 500,
             "dilation_list": [1,2,4],
             "out_features": 12,
             "hid_dim_fore": 32,

@@ -86,7 +86,8 @@ class ResidualTCAN(nn.Module):
         inputs = inputs.permute(0, 2, 1)
         out_tcn_1 = self.bn1(self.chomp1(self.conv1(inputs)))
         out_tcn_1 = out_tcn_1.permute(2, 0, 1)
-        attn_mask = torch.tensor([[1 if i<j else 0 for j in range(n_back)] for i in range(n_back)]).bool()
+        attn_mask = torch.tensor([[1 if i<j else 0 for j in range(n_back)] for i in range(n_back)])\
+            .bool().to(inputs.device)
         out_attn_1, attn_weight_1 = self.multiheadattn1(out_tcn_1, out_tcn_1, out_tcn_1, attn_mask=attn_mask)
         out_attn_1 = F.relu(out_attn_1).permute(1, 2, 0)
         out_tcn_2 = self.bn2(self.chomp2(self.conv2(out_attn_1)))
@@ -95,7 +96,7 @@ class ResidualTCAN(nn.Module):
         out_attn_2 = F.relu(out_attn_2).permute(1, 0, 2)
         res_en = torch.sum(attn_weight_2, -1)[...,None].repeat(1,1,inputs.shape[1]) * inputs.permute(0,2,1)
         res = self.downsample(inputs) if self.downsample is not None else inputs
-        attn_weight_detach = attn_weight_2.detach().numpy()
+        attn_weight_detach = attn_weight_2.cpu().detach().numpy()
         attn_return = [attn_weight_detach[0], attn_weight_detach[batch_size//2], attn_weight_detach[-1]]
         # return F.relu(out_attn_2 + res.permute(0, 2, 1) + res_en), attn_return
         return F.relu(out_attn_2 + res.permute(0, 2, 1)), attn_return

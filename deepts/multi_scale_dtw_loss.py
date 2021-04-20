@@ -17,12 +17,14 @@ def multi_scale_dtw_loss(outputs, targets, scale_list, alpha=0.5, gamma=0.01, de
 	for scale in scale_list:
 		loss_shape = loss_shape + softdtw_batch(D,gamma,scale)
 	loss_shape = loss_shape/len(scale_list)
+	# print("shape: {}".format(loss_shape))
 
 	path_dtw = PathDTWBatch.apply
 	path = path_dtw(D,gamma)           
 	Omega =  pairwise_distances(torch.arange(1,N_output+1).view(N_output,1)).to(device)
 	loss_temporal =  torch.sum( path*Omega ) / (N_output*N_output) 
 	loss_temporal = loss_temporal
+	# print("temporal: {}".format(loss_temporal))
 	loss = alpha*loss_shape+ (1-alpha)*loss_temporal
 	
 	return loss
