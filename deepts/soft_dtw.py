@@ -40,33 +40,23 @@ def compute_softdtw(D, gamma, scale):
   R = np.zeros((N + 2, M + 2)) + 1e8
   R[0, 0] = 0
 
-  # softmins = []
   for j in range(1, M + 1):
     for i in range(1, N + 1):
-
-      # embed(header="compute softdtw")
-
       r0 = -R[i - 1, j - 1] / gamma
       r1 = -R[i - 1, j] / gamma
       r2 = -R[i, j - 1] / gamma
-      # r0 = R[i - 1, j - 1]
-      # r1 = R[i - 1, j]
-      # r2 = R[i, j - 1]
       rmax = max(max(r0, r1), r2)
       if abs(i-j) <= scale:
         rsum = np.exp(r0 - rmax) + np.exp(r1 - rmax) + np.exp(r2 - rmax)
         softmin = - gamma * (np.log(rsum) + rmax)
-        # softmin = min_func(min_func(r0, r1), r2)
         R[i, j] = D[i - 1, j - 1] + softmin
-        # softmins.append(softmin)
-      else:
-        R[i, j] = 0.0
-  # print(np.mean(softmins))
+      # else:
+      #   R[i, j] = 0.0
 
   return R
 
 @jit(nopython = True)
-def compute_softdtw_backward(D_, R, gamma):
+def compute_softdtw_backward(D_, R, gamma, scale):
   N = D_.shape[0]
   M = D_.shape[1]
   D = np.zeros((N + 2, M + 2))
@@ -75,16 +65,21 @@ def compute_softdtw_backward(D_, R, gamma):
   E[-1, -1] = 1
   R[:, -1] = -1e8
   R[-1, :] = -1e8
+  for j in range(M, 0, -1):
+    for i in range(N, 0, -1):
+      if abs(i-j) > scale:
+        R[i,j] = -1e8
   R[-1, -1] = R[-2, -2]
   for j in range(M, 0, -1):
     for i in range(N, 0, -1):
-      a0 = (R[i + 1, j] - R[i, j] - D[i + 1, j]) / gamma
-      b0 = (R[i, j + 1] - R[i, j] - D[i, j + 1]) / gamma
-      c0 = (R[i + 1, j + 1] - R[i, j] - D[i + 1, j + 1]) / gamma
-      a = np.exp(a0)
-      b = np.exp(b0)
-      c = np.exp(c0)
-      E[i, j] = E[i + 1, j] * a + E[i, j + 1] * b + E[i + 1, j + 1] * c
+      if abs(i-j) <= scale:
+        a0 = (R[i + 1, j] - R[i, j] - D[i + 1, j]) / gamma
+        b0 = (R[i, j + 1] - R[i, j] - D[i, j + 1]) / gamma
+        c0 = (R[i + 1, j + 1] - R[i, j] - D[i + 1, j + 1]) / gamma
+        a = np.exp(a0)
+        b = np.exp(b0)
+        c = np.exp(c0)
+        E[i, j] = E[i + 1, j] * a + E[i, j + 1] * b + E[i + 1, j + 1] * c
   
   return E[1:N + 1, 1:M + 1]
  
@@ -95,30 +90,33 @@ class SoftDTWBatch(Function):
         dev = D.device
         batch_size,N,N = D.shape
         gamma = torch.FloatTensor([gamma]).to(dev)
+        scale = torch.FloatTensor([scale]).to(dev)
         D_ = D.detach().cpu().numpy()
         g_ = gamma.item()
+        s_ = scale.item()
 
         total_loss = 0
         R = torch.zeros((batch_size, N+2 ,N+2)).to(dev)   
         for k in range(0, batch_size): # loop over all D in the batch    
-            Rk = torch.FloatTensor(compute_softdtw(D_[k,:,:], g_, scale)).to(dev)
+            Rk = torch.FloatTensor(compute_softdtw(D_[k,:,:], g_, s_)).to(dev)
             R[k:k+1,:,:] = Rk
             total_loss = total_loss + Rk[-2,-2]
-        ctx.save_for_backward(D, R, gamma)
+        ctx.save_for_backward(D, R, gamma, scale)
         return total_loss / batch_size
   
     @staticmethod
     def backward(ctx, grad_output):
         dev = grad_output.device
-        D, R, gamma = ctx.saved_tensors
+        D, R, gamma, scale = ctx.saved_tensors
         batch_size,N,N = D.shape
         D_ = D.detach().cpu().numpy()
         R_ = R.detach().cpu().numpy()
         g_ = gamma.item()
+        s_ = scale.item()
 
         E = torch.zeros((batch_size, N ,N)).to(dev) 
         for k in range(batch_size):         
-            Ek = torch.FloatTensor(compute_softdtw_backward(D_[k,:,:], R_[k,:,:], g_)).to(dev)
+            Ek = torch.FloatTensor(compute_softdtw_backward(D_[k,:,:], R_[k,:,:], g_, s_)).to(dev)
             E[k:k+1,:,:] = Ek
         
         return grad_output * E, None, None
