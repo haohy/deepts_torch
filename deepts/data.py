@@ -90,15 +90,15 @@ class TSDataset:
             for i in range(num):
                 if period == 'future':
                     dynamic_feature_cat.append(
-                        static_feat_i[tail_idx-(i+1)*self.n_fore: tail_idx-i*self.n_fore]
+                        static_feat_i[tail_idx-(i+1)*self.n_fore: tail_idx-i*self.n_fore].astype(np.int32)
                     )
                 elif period == 'backward':
                     dynamic_feature_cat.append(
-                        static_feat_i[tail_idx-self.n_back-(i+1)*self.n_fore: tail_idx-(i+1)*self.n_fore]
+                        static_feat_i[tail_idx-self.n_back-(i+1)*self.n_fore: tail_idx-(i+1)*self.n_fore].astype(np.int32)
                     )
                 elif period == 'all':
                     dynamic_feature_cat.append(
-                        static_feat_i[tail_idx-self.n_back-self.n_fore-i*self.n_fore: tail_idx-i*self.n_fore]
+                        static_feat_i[tail_idx-self.n_back-self.n_fore-i*self.n_fore: tail_idx-i*self.n_fore].astype(np.int32)
                     )
         self.dynamic_feature_cat = np.stack(dynamic_feature_cat, axis=0)
         return torch.LongTensor(self.dynamic_feature_cat)

@@ -292,7 +292,7 @@ if __name__ == '__main__':
     # for gamma in gamma_list:
     #     TSF_DeepTCN(config_model, config_dataset, 'DeepTCN3', 'bike_hour', 'ms_dtwi', 0.0, gamma, 4)
     # TSF_DeepTCN(config_model, config_dataset, 'DeepTCN3', 'bike_hour', 'ms_dtwi', 0.4, 0.01, 10)
-    TSF_DeepTCN(config_model, config_dataset, 'DeepTCN3', 'bike_hour', 'mseloss', 0.4, 0.0001, 1)
+    TSF_DeepTCN(config_model, config_dataset, 'DeepTCN3', 'bike_hour', 'mseloss', 0.4, 1.0, 4)
     # for num_scale in [10, 8, 6, 4, 2]:
     #     TSF_DeepTCN(config_model, config_dataset, 'DeepTCN3', 'bike_hour', 'ms_dtwi', 0.4, 0.001, num_scale)
     # processes = []

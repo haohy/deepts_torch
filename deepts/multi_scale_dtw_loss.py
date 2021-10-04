@@ -27,5 +27,5 @@ def multi_scale_dtw_loss(outputs, targets, scale_list, alpha=0.5, gamma=0.01, de
 	# print("temporal: {}".format(loss_temporal))
 	loss = alpha*loss_shape+ (1-alpha)*loss_temporal
 	
-	return loss
+	return loss, loss_shape, loss_temporal
 	# return softdtw_batch(D,gamma,scale_list)

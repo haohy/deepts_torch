@@ -68,8 +68,8 @@ def TSF_SVR(config_model, config_dataset, model_name, ds_name):
     regr = SVR()
     regr.fit(x_train_re, y_train_re)
     y_pred = regr.predict(x_test_re)
-    y_pred_re = np.reshape(y_pred, [-1, 24])
-    y_test_re = np.reshape(y_test_re, [-1, 24])
+    y_pred_re = np.reshape(y_pred, [-1, 7])
+    y_test_re = np.reshape(y_test_re, [-1, 7])
 
     results = {
         'datetime': now,
@@ -101,4 +101,4 @@ if __name__ == '__main__':
         config_all = json.load(conf)
     config_dataset = config_all['dataset']
     config_model = config_all['model']
-    TSF_SVR(config_model, config_dataset, 'DeepTCN3', 'PRSA_svr')
+    TSF_SVR(config_model, config_dataset, 'DeepTCN3', 'sales_svr')

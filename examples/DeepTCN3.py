@@ -1,11 +1,13 @@
 import json
 import time
+import copy
 import os, sys
 import datetime
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(1, os.getcwd())
 
 import pandas as pd
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -22,7 +24,6 @@ from deepts.metrics import MASE, ND, NRMSE, SMAPE, MAE, MSE
 from examples.utils import set_logging, save_predictions, plot_predictions, record, draw_attn, save_model, load_model
 
 logging = set_logging()
-logger = SummaryWriter('./examples/logs')
 from IPython import embed
 
 def evaluate(model, x_test_list, y_test, multi_scale_dtw_loss, scale_all, gamma, device, final=False):
@@ -32,7 +33,8 @@ def evaluate(model, x_test_list, y_test, multi_scale_dtw_loss, scale_all, gamma,
     input_static_emb = input_static_emb.to(device)
     input_dynamic_emb = input_dynamic_emb.to(device)
     y_test = y_test.to(device)
-    ms_dtw_test = 0.0
+    ms_dtw_test = torch.tensor(0.0)
+    tdi_test = torch.tensor(0.0)
     with torch.no_grad():
         y_pred_test, _ = model(input_ts, input_static_emb, input_dynamic_emb)
         nd_test = float(ND(y_test, y_pred_test))
@@ -41,9 +43,10 @@ def evaluate(model, x_test_list, y_test, multi_scale_dtw_loss, scale_all, gamma,
         mae_test = float(MAE(y_test, y_pred_test))
         mse_test = float(MSE(y_test, y_pred_test))
         if final:
-            ms_dtw_test = float(multi_scale_dtw_loss(y_pred_test, y_test, scale_all, 1.0, 0.0001).item())
+            ms_dtw_test, _, _ = multi_scale_dtw_loss(y_pred_test, y_test, scale_all, 1.0, 0.0001)
+            tdi_test, _, _ = multi_scale_dtw_loss(y_pred_test, y_test, scale_all, 0.0, 0.0001)
 
-    return nd_test, smape_test, nrmse_test, mae_test, mse_test, ms_dtw_test, y_pred_test
+    return nd_test, smape_test, nrmse_test, mae_test, mse_test, ms_dtw_test.item(), tdi_test.item(), y_pred_test
 
 def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name, criterion_type, 
                 alpha=0.5, gamma=0.01, num_scales=5, gpu_id=3):
@@ -131,9 +134,12 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name, criterion_typ
     # criterion = dilate_loss
     # num_scales = 3
     # scale_list = list(range(n_fore))[-num_scales:]
-    scale_list = [0]
+    # scale_list = [0]
     scale_all = list(range(n_fore))
-    # scale_list = list(range(n_fore))[slice(1, n_fore, n_fore//num_scales)]
+    # scale_list = list(range(n_fore))[slice(0, n_fore, n_fore//num_scales)]
+    # scale_list = np.linspace(0, n_fore, num_scales, dtype=np.int32)
+    scale_list = [24]
+    logging.info("scale_list = {}".format(scale_list))
     
     criterion_dict = {'ms_dtwi': multi_scale_dtw_loss,
                     'mseloss': nn.MSELoss(),
@@ -157,8 +163,13 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name, criterion_typ
     # x_test_list = [x.to(device) for x in x_test]
     # y_test = y_test.to(device)
 
+    model_best = None
+    note = "TCAN_" + ds_name +'_'+ criterion_type +'_'+ str(num_scales) +'_'+ str(alpha) +'_'+ str(gamma)
+    logging.info(note)
     for epoch in range(1, epochs+1):
         loss = 0
+        train_shape = 0
+        train_time = 0
         last_pred = None
         attn_matrixes = None
         time_cost = []
@@ -172,11 +183,14 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name, criterion_typ
             label = label.to(device)
             y_pred, attn_matrixes = model(input_ts, input_static_emb, input_dynamic_emb)
             if criterion_type == 'ms_dtwi':
-                loss_i = criterion(y_pred, label, scale_list, alpha, gamma)
+                loss_i, loss_i_shape, loss_i_time = criterion(y_pred, label, scale_list, alpha, gamma)
             else:
                 loss_i = criterion(y_pred, label)
+                loss_i_shape = loss_i_time = torch.tensor(0.0)
             
             loss += loss_i.item()
+            train_shape += loss_i_shape.item()
+            train_time += loss_i_time.item()
             loss_i.backward()
             optimizer.step()
 
@@ -189,59 +203,79 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name, criterion_typ
         # embed(header="dilate loss")
         # average_time = sum(time_cost) / len(train_dataloader)
         # ave_time_list.append(average_time)
+        loss_train = loss/len(train_dataloader)
+        train_shape = train_shape/len(train_dataloader)
+        train_time = train_time/len(train_dataloader)
         
         # y_pred_valid, _ = model(*x_valid_list)
-        nd_valid, smape_valid, nrmse_valid, mae_valid, mse_valid, ms_dtw_valid, y_pred_valid = evaluate(model, x_valid, y_valid, multi_scale_dtw_loss, scale_all, gamma, device)
+        nd_valid, smape_valid, nrmse_valid, mae_valid, mse_valid, _, _, y_pred_valid = evaluate(model, x_valid, y_valid, multi_scale_dtw_loss, scale_all, gamma, device)
         y_valid = y_valid.to(device)
         if criterion_type == 'ms_dtwi':
-            loss_val =  criterion(y_pred_valid, y_valid, scale_list, alpha, gamma)
+            loss_val, val_shape, val_time =  criterion(y_pred_valid, y_valid, scale_list, alpha, gamma)
         else:
             loss_val = criterion(y_pred_valid, y_valid)
         # nd_valid = ND(y_valid.cpu().detach(), y_pred_valid.cpu().detach())
         # smape_valid = SMAPE(y_valid.cpu().detach(), y_pred_valid.cpu().detach())
         # nrmse_valid = NRMSE(y_valid.cpu().detach(), y_pred_valid.cpu().detach())
-        logger_note = tag
-        logger.add_scalars('{}/loss_train'.format(logger_note), {'loss_train': loss/len(train_dataloader)}, epoch)
-        logger.add_scalars('{}/loss_val'.format(logger_note), {'loss_val':loss_val.item()}, epoch) 
-        logger.add_scalars('{}/nd_valid'.format(logger_note), {'nd_valid': nd_valid}, epoch)
-        logger.add_scalars('{}/smape_valid'.format(logger_note), {'smape_valid': smape_valid}, epoch)
-        logger.add_scalars('{}/nrmse_valid'.format(logger_note), {'nrmse_valid':nrmse_valid}, epoch) 
-        print("Epoch {}, Train Loss {:.4f}, Valid ND {:.4f}, Valid SMAPE {:.4f}, Valid NRMSE {:.4f}, Valid loss {:.4f}"\
-            .format(epoch, loss/len(train_dataloader), nd_valid, smape_valid, nrmse_valid, loss_val.item()))
+        # logger_note = tag
+        logger = SummaryWriter('./examples/logs/{}'.format(note), flush_secs=2)
+        logger.add_scalars('loss_train', {'loss_train': loss_train}, epoch)
+        if criterion_type == 'ms_dtwi':
+            logger.add_scalars('train_shape', {'train_shape': train_shape}, epoch)
+            logger.add_scalars('train_time', {'train_time': train_time}, epoch)
+        logger.add_scalars('loss_val', {'loss_val':loss_val.item()}, epoch) 
+        if criterion_type == 'ms_dtwi':
+            logger.add_scalars('val_shape', {'val_shape':val_shape.item()}, epoch) 
+            logger.add_scalars('val_time', {'val_time':val_time.item()}, epoch) 
+        logger.add_scalars('nd_valid', {'nd_valid': nd_valid}, epoch)
+        # logger.add_scalars('smape_valid', {'smape_valid': smape_valid}, epoch)
+        logger.add_scalars('nrmse_valid', {'nrmse_valid':nrmse_valid}, epoch) 
+        if criterion_type == 'ms_dtwi':
+            print("Epoch {}, Train Loss {:.4f}, Train shape {:.4f}, Train time {:.4f}, Valid loss {:.4f}, Valid shape {:.4f}, Valid time {:.4f}, Valid ND {:.4f}, Valid SMAPE {:.4f}, Valid NRMSE {:.4f}"\
+                .format(epoch, loss_train, train_shape, train_time, loss_val.item(), val_shape.item(), val_time.item(), nd_valid, smape_valid, nrmse_valid))
+        else:
+            print("Epoch {}, Train Loss {:.4f}, Valid loss {:.4f}, Valid ND {:.4f}, Valid NRMSE {:.4f}"\
+                .format(epoch, loss_train, loss_val.item(), nd_valid, nrmse_valid))
 
-        if epoch > patience_len and loss_val >= max(loss_val_list[-patience_len:]):
+        # if epoch > patience_len and loss_val >= max(loss_val_list[-patience_len:]):
+        if epoch > 0 and epoch % patience_len == 0:
             lr = lr / 2.
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr
+            print("lr = {}".format(lr))
 
         loss_val_list.append(loss_val)
-        nd_test, smape_test, nrmse_test, mae_test, mse_test, _, y_pred_test = evaluate(model, x_test, y_test, criterion, scale_all, gamma, device)
+        # nd_test, smape_test, nrmse_test, mae_test, mse_test, _, y_pred_test = evaluate(model, x_test, y_test, criterion, scale_all, gamma, device)
 
         if loss_val < loss_val_best:
             loss_val_best = loss_val
-            y_pred_test_best = y_pred_test
+            model_best = copy.deepcopy(model)
+            # y_pred_test_best = y_pred_test
             # save_model(model, tag)
-    nd_test, smape_test, nrmse_test, mae_test, mse_test, ms_dtw_test, y_pred_test = evaluate(model, x_test, y_test, multi_scale_dtw_loss, scale_all, gamma, device, True)
+    logger.close()
+    nd_valid, smape_valid, nrmse_valid, mae_valid, mse_valid, ms_dtw_valid, tdi_valid, y_pred_valid = evaluate(model_best, x_valid, y_valid, multi_scale_dtw_loss, scale_all, gamma, device, True)
+    nd_test, smape_test, nrmse_test, mae_test, mse_test, ms_dtw_test, tdi_test, y_pred_test_best = evaluate(model_best, x_test, y_test, multi_scale_dtw_loss, scale_all, gamma, device, True)
 
     # save results
     y_back_inverse = dataset.scaler.inverse_transform(x_test[0][:,:,0].cpu().numpy())
     y_true_inverse = dataset.scaler.inverse_transform(y_test.cpu().numpy())
     y_pred_inverse = dataset.scaler.inverse_transform(y_pred_test_best.cpu().detach().numpy())
 
-    note = "TCAN, " + ds_name +' '+ criterion_type +' '+ str(num_scales) +' '+ str(alpha) +' '+ str(gamma) + "scale_list = [0]"
+    # note = "TCAN, " + ds_name +' '+ criterion_type +' '+ str(num_scales) +' '+ str(alpha) +' '+ str(gamma)
     # note = "TCAN, ms_dtwi, scale_list = [0]"
     config.update({'ds_name': ds_name})
     config.update(config_dataset[ds_name])
     config.update({'datetime': now,
         'num_params': num_parameters_train,
         'nd_valid': round(float(nd_valid), 6),
-        'smape_valid': round(float(smape_valid), 6),
+        # 'smape_valid': round(float(smape_valid), 6),
         'nrmse_valid': round(float(nrmse_valid), 6),
         'mae_valid': round(mae_valid, 6),
         'mse_valid': round(mse_valid, 6),
         'ms_dtw_valid': round(ms_dtw_valid, 6),
+        'tdi_valid': round(tdi_valid, 6),
         'nd_test': round(nd_test, 6),
-        'smape_test': round(smape_test, 6),
+        # 'smape_test': round(smape_test, 6),
         'nrmse_test': round(nrmse_test, 6),
         'mae_test': round(mae_test, 6),
         'mse_test': round(mse_test, 6),
@@ -251,12 +285,13 @@ def TSF_DeepTCN(config_model, config_dataset, model_name, ds_name, criterion_typ
         # 'mae_test_bm': round(mae_test_bm, 6),
         # 'mse_test_bm': round(mse_test_bm, 6),
         'ms_dtw_test': round(ms_dtw_test, 6),
+        'tdi_test': round(tdi_test, 6),
         # 'time': sum(ave_time_list)/epochs,
         'note': note})
     record(config_dataset['record_file'], config)
 
     filename = save_predictions(y_back_inverse, y_true_inverse, y_pred_inverse, tag)
-    plot_predictions(filename, [0, int(len(y_pred_test)/2), -1])
+    plot_predictions(filename, [0, int(len(y_pred_test_best)/2), -1])
     logging.info('Finished.')
 
 
@@ -265,9 +300,10 @@ if __name__ == '__main__':
         config_all = json.load(conf)
     config_dataset = config_all['dataset']
     config_model = config_all['model']
-    gamma_list = [0.0001, 0.001, 0.01, 0.1]
-    alpha_list = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
-    num_scale_list = [2, 4, 6, 8, 10]
+    gamma_list = [0.0001, 0.001, 0.01, 0.1, 1.0]
+    gamma_list = [1.0]
+    alpha_list = [1.0, 0.8, 0.6, 0.4, 0.2, 0.0]
+    num_scale_list = [1, 2, 4, 6, 8, 10]
     # ds_name_list = ['traffic', 'TAS2016', 'bike_hour', 'PRSA']
     ds_name_list = ['bike_hour']
     criterion_type_list = ['huberloss', 'mseloss', 'ms_dtwi']
@@ -279,9 +315,12 @@ if __name__ == '__main__':
     #             for num_scale in num_scale_list:
                     # args_list.append([config_model, config_dataset, 'DeepTCN3', ds_name, criterion_type, alpha, num_scale])
     # for gamma in gamma_list:
-    #     TSF_DeepTCN(config_model, config_dataset, 'DeepTCN3', 'bike_hour', 'ms_dtwi', 0.0, gamma, 4)
-    # TSF_DeepTCN(config_model, config_dataset, 'DeepTCN3', 'bike_hour', 'ms_dtwi', 0.4, 0.01, 10)
-    TSF_DeepTCN(config_model, config_dataset, 'DeepTCN3', 'bike_hour', 'ms_dtwi', 1.0, 0.0001, 10)
+    #     TSF_DeepTCN(config_model, config_dataset, 'DeepTCN3', 'bike_hour', 'ms_dtwi', 0.4, gamma, 4)
+    # for num_scale in num_scale_list:
+    #     TSF_DeepTCN(config_model, config_dataset, 'DeepTCN3', 'bike_hour', 'ms_dtwi', 0.8, 0.1, num_scale)
+    # for alpha in alpha_list:
+    #     TSF_DeepTCN(config_model, config_dataset, 'DeepTCN3', 'bike_hour', 'ms_dtwi', alpha, 0.1, 4)
+    TSF_DeepTCN(config_model, config_dataset, 'DeepTCN3', 'sales', 'ms_dtwi', 0.8, 0.01, 4)
     # processes = []
    
 

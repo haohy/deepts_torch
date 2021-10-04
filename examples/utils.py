@@ -42,7 +42,7 @@ def plot_predictions(filename, ts_index):
     testset = load_predictions(filename)
     n_back = len(testset['y_back'][0])
     n_fore = len(testset['y_pred'][0])
-    x_back = list(range(n_back))
+    x_back = list(range(1, n_back+1))
     x_fore = list(range(n_back, n_back + n_fore))
     for idx, ts_idx in enumerate(ts_index):
         axes[idx].plot(x_back, testset['y_back'][ts_idx], label='back')
